@@ -9,15 +9,25 @@ my $datafile = shift or die "Need datafile!\n";
 die "Not a file: $datafile\n" if ( !-f $datafile );
 my @data = slurp($datafile);
 
+my $verbatim = shift;
+$verbatim = 0 if (!defined $verbatim);
+
 my $lineno = 0;
 foreach my $dataline (@data) {
     $lineno++;
     my ( $direction, $handle, $arrdata ) =
       $dataline =~ /^(Sent|Received)\s.*\s(.*)\:\s*\[([\d\,]+)\]\s*$/;
     if ( !defined $direction || !defined $handle || !defined $arrdata ) {
-        die "Line $lineno: regexp didn't catch!\n";
+        die "Line $lineno: regexp didn't catch!\n" if (!$verbatim);
+        $arrdata = $dataline;
+        $direction = 'Received';
     }
-    my @arr = split( ',', $arrdata );
+    my @arr;
+    if ($verbatim) {
+        @arr = map {ord $_} split('',$arrdata);
+    } else {
+        @arr = split( ',', $arrdata );
+    }
     foreach (@arr) {
         printf(
             "%-10s %3d %-10s %-10s %s\n",
