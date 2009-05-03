@@ -210,7 +210,7 @@ sub server_accept {
     $new_user->print("Hi, Welcome to the MUD!\r\n\r\n"); # FIXME BANNER
     $new_user->print( $new_user->prompt );
 
-    #$new_user->print( _256col() );
+    $new_user->print(sprintf "\33]0;Av4 - $new_user\a");
     $kernel->select_read( $new_client, "event_read" );
 }
 
