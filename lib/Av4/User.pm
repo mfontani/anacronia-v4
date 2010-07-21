@@ -158,6 +158,7 @@ sub state_get_name {
     $self->name($name);
     $self->state( $self->state + 1 );
     $self->print( ansify( sprintf("\n\r&YYou will be known as &c'&W%s&^&c'\r\n",$name) ) );
+    $self->print( sprintf "\33]0;Av4 - %s\a", "\Q$name\E" ); # sets terminal title
     $self->broadcast(
         $kernel, $self->id,
         "&W\Q$name\E &Ghas entered the MUD\n\r",
