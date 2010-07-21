@@ -1,0 +1,12 @@
+The spec: http://www.moo.mud.org/mcp/mcp2.html
+The simpleedit spec: http://www.moo.mud.org/mcp/simpleedit.html
+MCP in zMud: http://www.zuggsoft.com/zmud/mcp-dev.htm
+MCP GUI package o_O http://www.belfry.com/fuzzball/trebuchet/mcp-gui.htm
+
+Tinyfugue - see also http://www.ben.com/MOO/tf-mcp.html for updates
+http://www.awns.com/tkMOO-light/ - released 2001 o_O
+http://www.belfry.com/fuzzball/trebuchet/ - 1998?
+http://www.vmoo.com/en/ - windows only?
+
+zMud also supports it
+

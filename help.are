@@ -1,0 +1,36 @@
+#HELPS
+
+0 !~
+Syntax: !
+
+! should repeat the last command you typed.
+It is NOT implemented.
+~
+
+0 ANACRONIA V4~
+^y&WAnacronia V4&^ is the fourth rewrite of a Multi User Dungeon (MUD), a multi-user
+internet gaming system. It is written in the Perl programming language, and
+uses "modern" technologies and modules, such as POE, Moose, and Memcache.
+
+Anacronia v4 - Copyright (c) 2009,2010 Marco Fontani - MFONTANI at CPAN dot ORG
+Released under the GPL v.3.0 license
+~
+
+0 COMMANDS COMMAND QUEUE QUEUES~
+In many MUDs commands are parsed and executed in a first-come first-served fashion:
+if the character is currently performing an action which delays (casting a spelli for
+example), any other command (including non-delaying ones such as SCORE) need to wait
+for the first command to be executed.
+In other mode modern MUDs there may be multiple command queues which allow the player
+to perform delaying actions which don't overlap with each other. For example, using
+an attack prevents the player from attacking again before N seconds, but meanwhile
+the player can still ready a defensive command or see their statistics.
+Anacronia V4 implements a queue system in which all the unknown commands are weeded
+out of the command queue, and commands are executed in order of priority. Adding
+specific queue types (attack, defense, movement) is on the roadmap and should be
+fairly easy to implement.
+~
+
+0 $~
+
+#$
