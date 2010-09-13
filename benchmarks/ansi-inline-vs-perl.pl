@@ -69,23 +69,60 @@ END_INLINE_C
     }
 }
 
+### Lookup hash Perl version -- thanks illusori
+{
+    my @colors = qw/x r g y b p c w/;
+    my %colors = map { ord $colors[$_] => $_, ord uc $colors[$_] => $_ } 0..$#colors;
+    sub hash_perl_getcolor {
+        return exists $colors{$_[0]} ? $colors{$_[0]} : 255;
+    }
+}
+
+### Array Lookup Perl version -- thanks illusori
+{
+    my @colors = qw/x r g y b p c w/;
+    my @lookup;
+    for (0..$#colors) {
+        $lookup[ ord    $colors[$_] ] = $_;
+        $lookup[ ord uc $colors[$_] ] = $_;
+    }
+    use YAML;
+    sub lookup_perl_getcolor {
+        return defined $lookup[ $_[0] ] ? $lookup[ $_[0] ] : 255;
+    }
+}
+
 ### Give each possibility to cache stuff
 for (qw/x r g y b p c w ~/) {
-    getcolor(ord $_);
-    getcolor(ord uc $_);
-    opt_getcolor(ord $_);
-    opt_getcolor(ord uc $_);
-    perl_getcolor(ord $_);
-    perl_getcolor(ord uc $_);
-    opt_perl_getcolor(ord $_);
-    opt_perl_getcolor(ord uc $_);
+    my $lc = getcolor(ord $_);
+    my $uc = getcolor(ord uc $_);
+    opt_getcolor(ord $_) == $lc
+        or die "opt_getcolor( ord $_ ) returns wrong value";
+    opt_getcolor(ord uc $_) == $uc
+        or die "opt_getcolor( uc ord $_ ) returns wrong value";
+    perl_getcolor(ord $_) == $lc
+        or die "opt_getcolor( ord $_ ) returns wrong value";
+    perl_getcolor(ord uc $_) == $uc
+        or die "opt_getcolor( uc ord $_ ) returns wrong value";
+    opt_perl_getcolor(ord $_) == $lc
+        or die "opt_getcolor( ord $_ ) returns wrong value";
+    opt_perl_getcolor(ord uc $_) == $uc
+        or die "opt_getcolor( uc ord $_ ) returns wrong value";
+    hash_perl_getcolor(ord $_) == $lc
+        or die "opt_getcolor( ord $_ ) returns wrong value";
+    hash_perl_getcolor(ord uc $_) == $uc
+        or die "opt_getcolor( uc ord $_ ) returns wrong value";
+    lookup_perl_getcolor(ord $_) == $lc
+        or die "opt_getcolor( ord $_ ) returns wrong value";
+    lookup_perl_getcolor(ord uc $_) == $uc
+        or die "opt_getcolor( uc ord $_ ) returns wrong value";
 }
 
 
 my $result = timethese(
     1_500_000,
     {
-        'Opt Inline::C version' => sub {
+        'Opt Inline::C' => sub {
             for (qw/x r g y b p c w ~/) {
                 opt_getcolor(ord $_)
             }
@@ -93,7 +130,7 @@ my $result = timethese(
                 opt_getcolor(ord $_)
             }
         },
-        'Inline::C version' => sub {
+        'Inline::C' => sub {
             for (qw/x r g y b p c w ~/) {
                 getcolor(ord $_)
             }
@@ -101,7 +138,7 @@ my $result = timethese(
                 getcolor(ord $_)
             }
         },
-        'Pure Perl version' => sub {
+        'Pure Perl' => sub {
             for (qw/x r g y b p c w ~/) {
                 perl_getcolor(ord $_)
             }
@@ -109,12 +146,28 @@ my $result = timethese(
                 perl_getcolor(ord $_)
             }
         },
-        'Opt Perl version' => sub {
+        'Opt Perl' => sub {
             for (qw/x r g y b p c w ~/) {
                 opt_perl_getcolor(ord $_)
             }
             for (qw/X R G Y B P C W ~/) {
                 opt_perl_getcolor(ord $_)
+            }
+        },
+        'Hash Perl' => sub {
+            for (qw/x r g y b p c w ~/) {
+                hash_perl_getcolor(ord $_)
+            }
+            for (qw/X R G Y B P C W ~/) {
+                hash_perl_getcolor(ord $_)
+            }
+        },
+        'Lookup Perl' => sub {
+            for (qw/x r g y b p c w ~/) {
+                lookup_perl_getcolor(ord $_)
+            }
+            for (qw/X R G Y B P C W ~/) {
+                lookup_perl_getcolor(ord $_)
             }
         },
     }
@@ -122,13 +175,17 @@ my $result = timethese(
 cmpthese($result);
 
 __END__
-Benchmark: timing 1500000 iterations of Inline::C version, Opt Inline::C version, Opt Perl version, Pure Perl version...
-Inline::C version:  5 wallclock secs ( 4.45 usr +  0.00 sys =  4.45 CPU) @ 337078.65/s (n=1500000)
-Opt Inline::C version:  4 wallclock secs ( 3.83 usr +  0.00 sys =  3.83 CPU) @ 391644.91/s (n=1500000)
-Opt Perl version: 16 wallclock secs (15.18 usr +  0.00 sys = 15.18 CPU) @ 98814.23/s (n=1500000)
-Pure Perl version: 45 wallclock secs (43.77 usr +  0.01 sys = 43.78 CPU) @ 34262.22/s (n=1500000)
-                          Rate Pure Perl version Opt Perl version Inline::C version Opt Inline::C version
-Pure Perl version      34262/s                --             -65%              -90%                  -91%
-Opt Perl version       98814/s              188%               --              -71%                  -75%
-Inline::C version     337079/s              884%             241%                --                  -14%
-Opt Inline::C version 391645/s             1043%             296%               16%                    --
+Benchmark: timing 1500000 iterations of Hash Perl, Inline::C, Lookup Perl, Opt Inline::C, Opt Perl, Pure Perl...
+ Hash Perl: 11 wallclock secs (10.27 usr +  0.00 sys = 10.27 CPU) @ 146056.48/s (n=1500000)
+ Inline::C:  4 wallclock secs ( 4.13 usr +  0.00 sys =  4.13 CPU) @ 363196.13/s (n=1500000)
+Lookup Perl:  9 wallclock secs ( 8.61 usr +  0.00 sys =  8.61 CPU) @ 174216.03/s (n=1500000)
+Opt Inline::C:  3 wallclock secs ( 3.64 usr +  0.00 sys =  3.64 CPU) @ 412087.91/s (n=1500000)
+  Opt Perl: 14 wallclock secs (14.13 usr +  0.00 sys = 14.13 CPU) @ 106157.11/s (n=1500000)
+ Pure Perl: 43 wallclock secs (42.49 usr +  0.01 sys = 42.50 CPU) @ 35294.12/s (n=1500000)
+                  Rate Pure Perl Opt Perl Hash Perl Lookup Perl Inline::C Opt Inline::C
+Pure Perl      35294/s        --     -67%      -76%        -80%      -90%          -91%
+Opt Perl      106157/s      201%       --      -27%        -39%      -71%          -74%
+Hash Perl     146056/s      314%      38%        --        -16%      -60%          -65%
+Lookup Perl   174216/s      394%      64%       19%          --      -52%          -58%
+Inline::C     363196/s      929%     242%      149%        108%        --          -12%
+Opt Inline::C 412088/s     1068%     288%      182%        137%       13%            --
