@@ -1,4 +1,6 @@
 package Av4::Server;
+use strict;
+use warnings;
 use Av4::Help;
 use Av4::User;
 
