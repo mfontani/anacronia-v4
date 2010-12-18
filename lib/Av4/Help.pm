@@ -1,8 +1,21 @@
 package Av4::Help;
-use Moose;
-has 'level'    => ( is => 'rw', isa => 'Num', required => 1, );
-has 'keywords' => ( is => 'rw', isa => 'Str', required => 1, );
-has 'data'     => ( is => 'rw', isa => 'Str', required => 1, );
-__PACKAGE__->meta->make_immutable();
-no Moose;
+use strict;
+use warnings;
+use Class::XSAccessor {
+    constructor => '_new',
+    accessors => [qw/level keywords data/],
+};
+
+sub new {
+    my $class = shift;
+    $class->_new(
+        # defaults
+        level => 0,
+        keywords => '',
+        data => '',
+        # wanted options
+        @_,
+    );
+}
+
 1;
