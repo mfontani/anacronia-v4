@@ -9,7 +9,7 @@ use YAML;
 
 use Class::XSAccessor {
     constructor => '_new',
-    accessors => [qw/server id state name telopts mcp_authentication_key mcp_packages_supported commands commands_dispatched delay/],
+    accessors => [qw/server id state name telopts mcp_authentication_key mcp_packages_supported commands commands_dispatched queue delay/],
 };
 
 sub new {
