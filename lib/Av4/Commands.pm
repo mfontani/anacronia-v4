@@ -1,28 +1,44 @@
 package Av4::Commands;
-use Moose;
+use strict;
+use warnings;
 use Av4::Command;
 use Av4::Commands::Basic;
 use Av4::Commands::MCP;
 
-has 'commands' => (
-    traits    => ['Hash'],
-    is        => 'rw',
-    #isa       => 'HashRef[Av4::Command]', # this makes testcover DIE
-    isa       => 'HashRef', # this doesn't
-    default   => sub { {} },
-    handles  => {
-        all_cmds   => 'keys',
-        cmd_get    => 'get',
-        cmd_set    => 'set',
-    },
-);
+use Class::XSAccessor {
+    constructor => '_new',
+    accessors => [qw/commands keywords data/],
+};
 
-sub BUILD {
-    my $self = shift;
+sub new {
+    my $class = shift;
+    my $self = $class->_new(
+        # defaults
+        commands => {},
+        keywords => '',
+        data => '',
+        # wanted options
+        @_,
+    );
     $self->_add_mcp_commands();
     $self->_add_basic_commands();
     $self->_add_admin_commands();
-    return $self;
+    $self;
+}
+
+#    handles  => {
+#        all_cmds   => 'keys',
+#        cmd_get    => 'get',
+#        cmd_set    => 'set',
+#    },
+
+sub cmd_set {
+    my ($self,$what,$data) = @_;
+    $self->commands->{lc $what} = $data;
+}
+sub cmd_get {
+    my ($self,$what) = @_;
+    $self->commands->{lc $what};
 }
 
 sub exists {
@@ -181,6 +197,4 @@ sub _add_admin_commands {
     );
 }
 
-no Moose;
-__PACKAGE__->meta->make_immutable();
 1;
