@@ -1,13 +1,37 @@
 package Av4::User;
+use strict;
+use warnings;
 use Av4;
 use Av4::Commands;
 use Av4::TelnetOptions;
-use Moose;
 use Av4::Utils qw/get_logger ansify/;
 use YAML;
 
-has 'server' => ( is => 'rw', isa => 'Av4::Server', required => 1, );
-has 'id'     => ( is => 'ro', isa => 'Any',         required => 1 );
+use Class::XSAccessor {
+    constructor => '_new',
+    accessors => [qw/server id state name telopts mcp_authentication_key mcp_packages_supported commands commands_dispatched delay/],
+};
+
+sub new {
+    my $class = shift;
+    my $self = $class->_new(
+        # defaults
+        server => {},
+        id => '',
+        state => 0,
+        name => '',
+        mcp_authentication_key => '',
+        mcp_packages_supported => {},
+        commands => Av4::Commands->new(),
+        commands_dispatched => [],
+        queue => [],
+        delay => 0,
+        # wanted options
+        @_,
+    );
+    $self->telopts(Av4::TelnetOptions->new( user => $self )); # FIXME may have been given in params
+    $self;
+}
 
 our %states = (
     CONNECTED  => 0,
@@ -18,57 +42,6 @@ our %state_name = reverse %states;
 our %state_dispatch = (
     0 => \&state_get_name,
 );
-has 'state'  => ( is => 'rw', isa => 'Int',         required => 1, default => 0 );
-
-has 'name'   => ( is => 'rw', isa => 'Str',         required => 1, default => '' );
-
-has 'telopts' => (
-    is       => 'rw',
-    isa      => 'Av4::TelnetOptions',
-    required => 1,
-    default  => sub { my $self = shift; Av4::TelnetOptions->new( user => $self ) }
-);
-
-has 'mcp_authentication_key' => (
-    is       => 'rw',
-    isa      => 'Str',
-    required => 1,
-    default  => '',
-);
-has 'mcp_packages_supported' => (
-    is       => 'rw',
-    isa      => 'HashRef[ArrayRef]',
-    required => 1,
-    default  => sub { {} },
-);
-has 'commands' => (
-    is       => 'rw',
-    isa      => 'Av4::Commands',
-    required => 1,
-    default  => sub { Av4::Commands->new() }
-);
-has 'commands_dispatched' => (
-    is       => 'rw',
-    isa      => 'ArrayRef[Str]',
-    required => 1,
-    default  => sub { [] },
-);
-has 'queue' => (
-    is => 'rw',
-    #isa => 'ArrayRef[Str]', # makes testcover die
-    isa => 'ArrayRef',
-    required => 1,
-    default => sub { [] },
-);
-
-#has '_prompt' => (
-#    is       => 'rw',
-#    isa      => 'Str',
-#    lazy     => 1,
-#    required => 1,
-#    default  => sub { scalar shift->id . ' > ' }
-#);
-has 'delay' => ( is => 'rw', isa => 'Int', required => 1, default => 0 );
 
 sub received_data {
     my ( $self, $data ) = @_;
