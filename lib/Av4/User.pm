@@ -261,6 +261,4 @@ sub dispatch_command {
     return;
 }
 
-__PACKAGE__->meta->make_immutable;
-no Moose;
 1;
