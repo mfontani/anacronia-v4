@@ -5,6 +5,7 @@ use warnings;
 
 use lib './lib';
 
+use EV;
 use AnyEvent;
 use AnyEvent::Socket;
 use AnyEvent::Handle;
