@@ -263,6 +263,16 @@ sub shutdown {
     $quit_program->send($shutdown_by);
 }
 
+sub client_quit {
+    #my $log = get_logger();
+    broadcast(
+        "&W$_[0] &Gquits the MUD\n\r",
+        1,    # send prompt to others
+    );
+    $server->clients( [grep { $_->id ne $_[0] } @{$server->clients}] );
+}
+
+
 =for later
 
 {
@@ -456,18 +466,6 @@ sub broadcast {
         $user->print( $user->prompt ) if ($sendprompt);
         $kernel->yield( event_write => $user->id );
     }
-}
-
-sub client_quit {
-    my ( $self, $kernel, $client ) = @_[ HEAP, KERNEL, ARG0 ];
-    #my $log = get_logger();
-    $self->broadcast(
-        $kernel,
-        "&W$client &Gquits the MUD\n\r",
-        1,    # send prompt to others
-    );
-    $kernel->yield( event_write => $client );    # flushes all output
-    $kernel->yield( event_done  => $client );
 }
 
 sub client_error {
