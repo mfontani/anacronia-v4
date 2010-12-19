@@ -61,8 +61,9 @@ sub prompt {
 
 sub print {
     my $self = shift;
-    my $out = join( '', @_ );
-    $self->telopts->send_data(\$out);
+    $self->telopts->send_data(\$_) for @_;
+    #my $out = join( '', @_ );
+    #$self->telopts->send_data(\$out);
 }
 
 sub broadcast {
