@@ -94,6 +94,11 @@ sub run {
             $quit_program->send('SIGINT');
         }
     );
+    my $tick_commands = AnyEvent->timer(
+        after => 1.0,
+        interval => 0.5,
+        cb => \&tick_commands,
+    );
     $mud_start = [gettimeofday];
     my $shutdown_by = $quit_program->recv;
     my $mud_uptime = tv_interval($mud_start,[gettimeofday]);
@@ -159,6 +164,7 @@ sub server_accept_cb {
 
 sub client_read {
     my $data = $_[0]->rbuf;
+    $_[0]->rbuf = '';
     my $log = get_logger();
     my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
     die "Cant find user $_[0] in clients!" if ( !defined $user );
@@ -220,6 +226,36 @@ sub broadcast {
     }
 }
 
+sub tick_commands {
+    my @clients = grep { defined $_ } @{ $server->clients };
+    $server->clients( \@clients );
+    #return if check_shutdown( $self );
+    foreach my $client ( @{ $server->clients } ) {
+        next if ( !defined $client );
+        $client->delay(
+              $client->delay - 1 >= 0
+            ? $client->delay - 1
+            : 0
+        );
+        my ( $dispatched, $redispatch ) = $client->dispatch_command();
+        if ( defined $dispatched ) {
+            push @{ $client->commands_dispatched }, $dispatched;
+        }
+        #if ( exists $self->server->outbuffer->{ $client->id } ) {
+        #    $kernel->select_write( $client->id, "event_write" );
+        #}
+        redo if ( defined $redispatch && $redispatch );
+
+        #$client->print( $client->prompt )
+        #  if ( defined $dispatched && (
+        #        $dispatched !~ /^\s*quit\s*$/
+        #        && $dispatched !~ /^\s*\@$/
+        #    )
+        #);
+    }
+    #$_[KERNEL]->delay( tick_commands => $tick_commands );
+}
+
 =for later
 
 {
@@ -276,37 +312,6 @@ sub check_shutdown {
     }
     $kernel->delay( shutdown => 1 );
     return 1;
-}
-
-sub tick_commands {
-    my ( $self, $kernel, $server ) = @_[ HEAP, KERNEL, ARG0 ];
-    my @clients = grep { defined $_ } @{ $self->server->clients };
-    $self->server->clients( \@clients );
-    return if check_shutdown( $self, $kernel );
-    foreach my $client ( @{ $self->server->clients } ) {
-        next if ( !defined $client );
-        $client->delay(
-              $client->delay - 1 >= 0
-            ? $client->delay - 1
-            : 0
-        );
-        my ( $dispatched, $redispatch ) = $client->dispatch_command( $_[KERNEL] );
-        if ( defined $dispatched ) {
-            push @{ $client->commands_dispatched }, $dispatched;
-        }
-        if ( exists $self->server->outbuffer->{ $client->id } ) {
-            $kernel->select_write( $client->id, "event_write" );
-        }
-        redo if ( defined $redispatch && $redispatch );
-
-        #$client->print( $client->prompt )
-        #  if ( defined $dispatched && (
-        #        $dispatched !~ /^\s*quit\s*$/
-        #        && $dispatched !~ /^\s*\@$/
-        #    )
-        #);
-    }
-    $_[KERNEL]->delay( tick_commands => $tick_commands );
 }
 
 sub server_accept {

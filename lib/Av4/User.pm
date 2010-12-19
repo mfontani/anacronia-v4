@@ -69,7 +69,7 @@ sub print {
 }
 
 sub broadcast {
-    my ( $self, $kernel, $client, $message, $selfmessage, $sendprompt, $sendtoself ) = @_;
+    my ( $self, $client, $message, $selfmessage, $sendprompt, $sendtoself ) = @_;
     $sendprompt  = 0        if ( !defined $sendprompt );
     $sendtoself  = 1        if ( !defined $sendtoself );
     $selfmessage = $message if ( !defined $selfmessage );
@@ -91,7 +91,7 @@ sub broadcast {
             $user->print( $a_message );
             $user->print( $user->prompt ) if ($sendprompt);
         }
-        $kernel->yield( event_write => $user->id );
+        #$kernel->yield( event_write => $user->id );
     }
 }
 
@@ -136,7 +136,7 @@ sub state_get_name {
     $self->print( ansify( sprintf("\n\r&YYou will be known as &c'&W%s&^&c'\r\n",$name) ) );
     $self->print( sprintf "\33]0;Av4 - %s\a", "\Q$name\E" ); # sets terminal title
     $self->broadcast(
-        $kernel, $self->id,
+        $self->id,
         "&W\Q$name\E &Ghas entered the MUD\n\r",
         "&WYou &Ghave entered the MUD\n\r",
         1,    # send prompt to others
@@ -149,7 +149,7 @@ sub state_get_name {
 # If the user isn't delayed, executes the most prioritized command
 # If the user is delayed, executes the most prioritized non-delaying command
 sub dispatch_command {
-    my ( $self, $kernel ) = @_;
+    my ( $self ) = @_;
     my $log = get_logger(1);
     #$log->debug("Dispatching command for $self");
     if ( !@{ $self->queue } ) {
@@ -166,7 +166,7 @@ sub dispatch_command {
 
     my $sub = $state_dispatch{ $self->state } // 0;
     if ( $sub ) {
-        return $sub->($self,$kernel);
+        return $sub->($self);
     }
 
     #$log->info( "Weeded $self commands in queue: " . dumpqueue($self) );
@@ -236,12 +236,13 @@ sub dispatch_command {
         next if ( $self->delay && $self->commands->cmd_get($cmd)->delays );
         if ( $self->commands->cmd_get($cmd)->priority() >= $highest_priority ) {
             #$log->info("Dispatching client $self with command (#$lineno) $cmd args $args");
-            my $delay = $self->commands->cmd_get($cmd)->exec( $kernel, $self->id, $self, $args );
+            #my $delay = $self->commands->cmd_get($cmd)->exec( $kernel, $self->id, $self, $args );
+            my $delay = $self->commands->cmd_get($cmd)->exec( $self->id, $self, $args );
             $Av4::cmd_processed++;
             $self->delay( $self->delay + $delay );
 
             $self->print( $self->prompt ) if ( $cmd !~ /^\s*quit\s*$/ );
-            #$log->debug("***DISPATCHED/DELETING $cmd $args");
+            $log->debug("***DISPATCHED/DELETING $cmd $args");
 
             #push @effectively_dispatched, "$cmd $args";
             my $command_dispatched = $self->queue->[$lineno];
