@@ -24,8 +24,8 @@ sub cmd_shout {
     #$log->info("$client shouts $argstr");
     $user->broadcast(
         $client,
-        "&r$client shouts: &W$argstr\n\r",
-        "&rYou shout: &W$argstr\n\r",
+        ansify("&r$client") . ansify(" shouts: ") . ansify("&W$argstr") . "\n\r",
+        ansify("&rYou shout: ") . ansify("&W$argstr") . "\n\r",
         1,    # send prompt to others
     );
 }
@@ -115,7 +115,7 @@ sub cmd_stats {
     my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
 
-    $user->print( ansify( "&gStatistics for user " . $user->id . ":\r\n" ) );
+    $user->print( ansify( "&gStatistics for user " ) . $user->id . ":\r\n" );
     $user->print( ' Your terminal is: ', $user->telopts->terminaltype, "\r\n", );
     if ( $user->telopts->naws_w && $user->telopts->naws_h ) {
         $user->print(

@@ -76,8 +76,8 @@ sub broadcast {
     my $log = get_logger();
     $log->info("Broadcasted from $client: $message");
 
-    my $a_selfmessage = ansify( $selfmessage );
-    my $a_message     = ansify( $message     );
+    #my $a_selfmessage = ansify( $selfmessage );
+    #my $a_message     = ansify( $message     );
 
     # Send it to everyone.
     foreach my $user ( @{ $self->server->clients } ) {
@@ -86,9 +86,9 @@ sub broadcast {
         next if ( $user->state != $STATE_PLAYING );
         #$log->info("Sending shout to client $user");
         if ( $user->id == $client ) {
-            $user->print( $a_selfmessage );
+            $user->print( $selfmessage );
         } else {
-            $user->print( $a_message );
+            $user->print( $message );
             $user->print( $user->prompt ) if ($sendprompt);
         }
         #$kernel->yield( event_write => $user->id );
@@ -135,12 +135,12 @@ sub state_get_name {
     $name =~ s/[\x0D\x0A]+//g;
     $self->name($name);
     $self->state( $self->state + 1 );
-    $self->print( ansify( sprintf("\n\r&YYou will be known as &c'&W%s&^&c'\r\n",$name) ) );
+    $self->print( sprintf("\n\r%s %s\r\n",ansify("&YYou will be known as"),ansify("&c'&W$name&^&c'")) );
     $self->print( sprintf "\33]0;Av4 - %s\a", "\Q$name\E" ); # sets terminal title
     $self->broadcast(
         $self->id,
-        "&W\Q$name\E &Ghas entered the MUD\n\r",
-        "&WYou &Ghave entered the MUD\n\r",
+        ansify("&W\Q$name\E").' '.ansify("&Ghas entered the MUD") . "\n\r",
+        ansify("&WYou &Ghave entered the MUD") . "\n\r",
         1,    # send prompt to others
     );
     $self->print( $self->prompt );

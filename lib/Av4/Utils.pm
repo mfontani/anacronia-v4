@@ -36,7 +36,7 @@ sub get_logger {
 our %ansify_cache;
 sub ansify {
     my ($str,$status) = @_;
-    if (length $str <= 20)
+    if (length $str <= 30)
     {
         if (exists $ansify_cache{$str})
         {
@@ -51,6 +51,7 @@ sub ansify {
     my $hit = $memd->get($md5);
     if ( $hit ) { $memcached_hits++ ; return $hit; }
     $memcached_misses++;
+    warn "Memcached MISS on $str";
     my $ansified = Av4::Ansi::ansify($str,$status);
     $memd->set($md5,$ansified);
     return $ansified;
