@@ -60,15 +60,13 @@ sub cmd_who {
     foreach my $plr ( @{ $user->server->clients } ) {
         next if ( !defined $plr );
         $user->print(
-            ansify(
-                sprintf(
-                    "%-30s %-20s %-5s %-5s %-5s\r\n",
-                    $plr,
-                    $plr->name,
-                    $plr->telopts->mccp          ? '&GMCCP' : '!MCCP',
-                    $plr->mcp_authentication_key ? '&GMCP'  : '!MCP',
-                    $plr->telopts->naws_w && $plr->telopts->naws_h ? '&GNAWS' : '!NAWS',
-                )
+            sprintf(
+                "%-30s %-20s %s %s %s\r\n",
+                ansify("&r$plr"),
+                ansify("&y" . $plr->name),
+                $plr->telopts->mccp          ? ansify('&gMCCP ') : ansify('&R!MCCP'),
+                $plr->mcp_authentication_key ? ansify('&gMCP  ')  : ansify('&R!MCP '),
+                ($plr->telopts->naws_w && $plr->telopts->naws_h) ? ansify(sprintf('&gNAWS %dx%d',$plr->telopts->naws_w,$plr->telopts->naws_h)) : ansify('&R!NAWS'),
             )
         );
     }
@@ -134,9 +132,9 @@ sub cmd_stats {
         $user->print( ' ', ansify("&rYou are NOT using MCCP\r\n") );
     }
     if ( !$user->mcp_authentication_key ) {
-        $user->print( ' You are ', ansify("&rNOT"), " using MCP\r\n" );
+        $user->print( ' ', ansify("&rYou are NOT using MCP\r\n") );
     } else {
-        $user->print(" You are using MCP:\r\n");
+        $user->print( ' ', ansify("&gYou are using MCP:\r\n") );
         foreach my $package ( keys %{ $user->mcp_packages_supported } ) {
             next if ( !defined $user->mcp_packages_supported->{$package} );
             $user->print(
@@ -201,7 +199,7 @@ sub cmd_stats {
     );
 
     if ( $user->telopts->mccp ) {
-        $user->print( ansify("&rThanks"), " for using MCCP!\r\n", );
+        $user->print( ansify("&rThanks for using MCCP!\r\n") );
     }
 
 }
@@ -211,7 +209,9 @@ sub cmd_quit {
 
     # send quit text
     $user->print("\r\n\r\nBye bye!!\r\n\r\n");
-    $user->id->destroy;
+    #$user->id->destroy;
+    #$user->id->push_shutdown();
+    $user->id->push_shutdown();
 }
 
 1;
