@@ -7,14 +7,14 @@ our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(cmd_shout cmd_commands cmd_debug cmd_help cmd_quit);
 
 sub cmd_shutdown {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
     $log->info( "Shutdown initiated by ", $user->id );
     Av4->shutdown($user);
 }
 
 sub cmd_shout {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     $argstr = '' if ( $argstr =~ /^\s*$/ );
     my $log = get_logger();
     if ( !$argstr ) {
@@ -23,7 +23,7 @@ sub cmd_shout {
     }
     #$log->info("$client shouts $argstr");
     $user->broadcast(
-        $kernel, $client,
+        $client,
         "&r$client shouts: &W$argstr\n\r",
         "&rYou shout: &W$argstr\n\r",
         1,    # send prompt to others
@@ -31,7 +31,7 @@ sub cmd_shout {
 }
 
 sub cmd_colors {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     $argstr = '' if ( $argstr =~ /^\s*$/ );
     my $log    = get_logger();
     my $output = "&RColors:&!\r\n";
@@ -53,7 +53,7 @@ sub cmd_colors {
 }
 
 sub cmd_who {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     $argstr = '' if ( $argstr =~ /^\s*$/ );
     my $log = get_logger();
     $user->print( ansify( "&g" . '#' x 32 . ' ONLINE ' . '#' x 32 . "\r\n" ) );
@@ -76,7 +76,7 @@ sub cmd_who {
 }
 
 sub cmd_commands {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
     $user->print( ansify("&RCommands in your queue:\r\n") );
     if ( !$user->queue ) {
@@ -91,7 +91,7 @@ sub cmd_commands {
 }
 
 sub cmd_debug {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     $argstr = '' if ( $argstr =~ /^\s*$/ );
     my $log = get_logger();
     $user->print( "You are session #", $user->id, "\r\n" );
@@ -99,7 +99,7 @@ sub cmd_debug {
 }
 
 sub cmd_help {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     $argstr = 'help' if ( $argstr =~ /^\s*$/ );
     my $log = get_logger();
     my $helppage = Av4::HelpParse::areahelp( $user->server->helps, $argstr );
@@ -114,7 +114,7 @@ sub cmd_help {
 }
 
 sub cmd_stats {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
 
     $user->print( ansify( "&gStatistics for user " . $user->id . ":\r\n" ) );
@@ -207,11 +207,11 @@ sub cmd_stats {
 }
 
 sub cmd_quit {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
 
     # send quit text
     $user->print("\r\n\r\nBye bye!!\r\n\r\n");
-    $kernel->yield( event_quit => $client );    # quits
+    $user->id->destroy;
 }
 
 1;

@@ -187,7 +187,7 @@ others from http://www.icecrew.nl/files//koemoe/mcp/index.xhtml
 
 # for command: #$#mcp *
 sub cmd_mcp_blank {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
     $log->info("Got MCP blank command: `$argstr`");
 
@@ -203,7 +203,7 @@ sub cmd_mcp_blank {
     # TODO: dispatch table?
     if ( $subcommands[0] eq 'authentication-key:' ) {
         $log->info('MCP => cmd_mcp_authentication_key');
-        return cmd_mcp_authentication_key( $kernel, $client, $user, $subcommands[1] );
+        return cmd_mcp_authentication_key( $client, $user, $subcommands[1] );
     } else {
         $log->info( 'UNKNOWN MCP COMMAND: >', $subcommands[0], '< => UNHANDLED!' );
     }
@@ -213,7 +213,7 @@ sub cmd_mcp_blank {
 # for command: #$#mcp authentication-key: AUTHKEY *
 # INTERNAL: only called by cmd_mcp_blank
 sub cmd_mcp_authentication_key {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
 
     # 480676 version: 2.1 to: 2.1
@@ -251,7 +251,7 @@ sub cmd_mcp_authentication_key {
 
 # for command: #$#mcp-negotiate-end AUTHKEY
 sub cmd_mcp_negotiate_end {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
     $log->info("Got MCP NEGOTIATE END: `$argstr`");
 
@@ -268,7 +268,7 @@ sub cmd_mcp_negotiate_end {
 
 # for command: #$#mcp-negotiate-can AUTHKEY package: PKGNAME min-version: MVER max-version: MXVER
 sub cmd_mcp_negotiate_can {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
     $log->info("Got MCP NEGOTIATE CAN: `$argstr`");
 
@@ -361,7 +361,7 @@ sub cmd_mcp_negotiate_can {
 
 # for command: #$#dns-com-awns-ping <authkey> id: <unique id>
 sub cmd_mcp_dns_com_awns_ping {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
     $log->info("Got MCP DNS-COM-AWNS-PING: `$argstr`");
 
@@ -419,7 +419,7 @@ sub cmd_mcp_dns_com_awns_ping {
 }
 
 sub cmd_at_editname {
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
 
     if ( !$user->mcp_authentication_key ) {

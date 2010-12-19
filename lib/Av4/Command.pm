@@ -22,7 +22,7 @@ sub new {
 
 sub exec {
     my $self = shift;
-    my ( $kernel, $client, $user, $argstr ) = @_;
+    my ( $client, $user, $argstr ) = @_;
 
     $user->print( ansify( "&gCommand: &c" . $self->name . " &C$argstr\r\n" ) )
       unless (
@@ -31,7 +31,7 @@ sub exec {
       );
 
     # 0 if shouldn't delay due to wrong parameters etc.
-    my $rc = $self->code->( $kernel, $client, $user, $argstr, );
+    my $rc = $self->code->( $client, $user, $argstr, );
     $rc = -1 if ( !defined $rc );
     $rc = $rc >= 0 ? $self->delays : 0;
     return $rc;
