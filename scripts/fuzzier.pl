@@ -26,8 +26,8 @@ foreach my $clin ( 1 .. $nclients ) {
 
             #print "Client $clin connected to $host:$port ...\n";
             $_[HEAP]->{banner_buffer} = [];
-            $_[KERNEL]->delay( send_stuff => rand(1) + 1 );
-            $_[HEAP]->{server}->put(random_name() . "\n\@queues\n");
+            $_[KERNEL]->delay( send_enter => int rand(3) + 1 );
+            $_[HEAP]->{server}->put(random_name() . "\n\n");
         },
         ConnectError => sub {
             print "Client $clin could not connect to $host:$port ...\n";
@@ -37,39 +37,37 @@ foreach my $clin ( 1 .. $nclients ) {
 
             #print "Client $clin got input from $host:$port ...\n";
             push @{ $heap->{banner_buffer} }, $input;
-            #$kernel->delay( send_stuff    => 0);
-            $kernel->delay( input_timeout => rand(1) + 1 );
+            $kernel->delay( send_stuff    => undef );
+            $kernel->delay( input_timeout => 1 );
         },
         InlineStates => {
             send_stuff => sub {
+
                 #print "Client $clin sending stuff on $host:$port ...\n";
-                if ( !defined $_[HEAP]->{server} )
-                {
-                    print "client $clin shutting down\n";
-                    $_[KERNEL]->yield("shutdown");
-                    return;
-                }
-                $_[KERNEL]->delay( input_timeout => rand(1) + 1 );
-                $_[HEAP]->{server}->put( rand_command() );
-                $commands++;
+                $_[HEAP]->{server}->put("");    # sends enter
+                $_[KERNEL]->delay( input_timeout => 5 );
+                $_[KERNEL]->delay( send_stuff    => int rand(3) + 1 );
             },
             input_timeout => sub {
                 my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
+
                 #print "Client $clin got input timeout from $host:$port ...\n";
                 if ( !defined $_[HEAP]->{server} ) {
                     print "client $clin shutting down\n";
                     $kernel->yield("shutdown");
                     return;
                 }
-                $_[KERNEL]->delay( send_stuff    => rand(1) + 1 );
+                $_[KERNEL]->delay( input_timeout => int rand(4) + 1 );
                 $_[HEAP]->{server}->put( rand_command() );
                 $commands++;
+
+                #print "Client $clin done\n";
             },
         },
     );
 }
 
-my @commands = qw/@queues help shout say help @queues who shout help stats @queues shout help say help azs/;
+my @commands = qw/help shout say help who shout help stats shout help say help azs/;
 my @helps    = qw/map help massign bede cod cry1 cry2 cry3 cry10/;
 
 sub rand_command {
