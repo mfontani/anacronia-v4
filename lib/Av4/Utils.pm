@@ -11,8 +11,10 @@ require Exporter;
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(get_logger ansify);
 
-our $hits   = 0;
-our $misses = 0;
+our $memcached_hits   = 0;
+our $memcached_misses = 0;
+our $memoized_hits    = 0;
+our $memoized_misses  = 0;
 
 our $memd = new Cache::Memcached::Fast({
     servers => [
@@ -31,12 +33,24 @@ sub get_logger {
     return Log::Log4perl->get_logger($subroutine);
 }
 
+our %ansify_cache;
 sub ansify {
     my ($str,$status) = @_;
+    if (length $str <= 20)
+    {
+        if (exists $ansify_cache{$str})
+        {
+            $memoized_hits++;
+            return $ansify_cache{$str};
+        }
+        $memoized_misses++;
+        $ansify_cache{$str} = Av4::Ansi::ansify($str,$status);
+        return $ansify_cache{$str};
+    }
     my $md5 = md5_hex($str);
     my $hit = $memd->get($md5);
-    if ( $hit ) { $hits++ ; return $hit; }
-    $misses++;
+    if ( $hit ) { $memcached_hits++ ; return $hit; }
+    $memcached_misses++;
     my $ansified = Av4::Ansi::ansify($str,$status);
     $memd->set($md5,$ansified);
     return $ansified;
