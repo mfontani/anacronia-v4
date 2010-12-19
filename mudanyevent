@@ -56,6 +56,69 @@ my $w = AnyEvent->signal(
     }
 );
 
+my $tick_commands = AnyEvent->timer(
+    after => 1.0,
+    interval => 0.1,
+    cb => sub {
+        return unless keys %clients;
+        my @deletion;
+        my $is_shutdown = 0;
+        for (keys %clients) {
+            my $handle = $clients{$_}->{handle};
+            #$handle->push_write("\nTICK!\n");
+            #$stats{sent_bytes}+=length("\nTICK!\n");
+            next if !@{ $clients{$_}->{lines} };
+            if ( @{ $clients{$_}->{lines} } > 50 )
+            {
+                push @deletion, $_;
+                next;
+            }
+            my $line = shift @{ $clients{$_}->{lines} };
+            #print "Client $_ got line $line\n";
+            if ($line =~ /\@shutdown/) {
+                $is_shutdown = "Client $_";
+                $handle->push_write("Shutting down\n");
+                $stats{sent_bytes} += length "Shutting down\n";
+                last;
+            }
+            if ($line =~ /\@queues/)
+            {
+                $handle->push_write($BANNER);
+                $stats{sent_bytes} += length $BANNER;
+                $handle->push_write("\n\nQUEUES:\n");
+                $stats{sent_bytes} += length "\n\nQUEUES:\n";
+                for my $c (sort keys %clients)
+                {
+                    my $line = sprintf("%-10s - %d\n", $c, scalar @{$clients{$c}->{lines}});
+                    $handle->push_write($line);
+                    $stats{sent_bytes} += length $line;
+                }
+                next;
+            }
+            ## print "($curr_client) Got: [", join(' ',map { sprintf("(%c(%d))",$_>=32&&$_<=126?$_:126,$_) } unpack('C*',$_[0]->rbuf)), "]\n";
+            $handle->push_write($line);
+            $stats{sent_bytes} += length $line;
+            $handle->push_write($BANNER);
+            $stats{sent_bytes} += length $BANNER;
+        }
+        if ( $is_shutdown )
+        {
+            my $msg = "\n\nMUD SHUTTING DOWN - by $is_shutdown\n\n";
+            for (keys %clients) {
+                $clients{$_}->{handle}->push_write($msg);
+                $stats{sent_bytes} += length $msg;
+            }
+            $quit_program->send($is_shutdown);
+        }
+        for (@deletion) {
+            warn "Client $_ spamming\n";
+            my $handle = $clients{$_}->{handle};
+            delete $clients{$_};
+            $handle->destroy; # destroy handle
+        }
+    },
+);
+
 my $shutdown_by = $quit_program->recv;
 my $secs = tv_interval($t0,[gettimeofday]);
 print "\n\nShut down by $shutdown_by\n";
@@ -81,7 +144,8 @@ sub accept_cb
             $handle->destroy; # destroy handle
         },
     );
-    $clients{$curr_client} = $fh;
+    $clients{$curr_client}{handle} = $handle;
+    $clients{$curr_client}{lines}  = [];
 
     $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_COMPRESS2 ) );
     $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_TTYPE ) );
@@ -93,17 +157,13 @@ sub accept_cb
 
     $handle->on_read( sub {
             $stats{recv_bytes} += length $_[0]->rbuf;
-            if ($_[0]->rbuf =~ /\@shutdown/) {
-                #undef $quit_program;
-                $handle->push_write("Shutting down\n");
-                $quit_program->send("Shutdown by $curr_client");
-                return;
-            }
-            # print "($curr_client) Got: [", join(' ',map { sprintf("(%c(%d))",$_>=32&&$_<=126?$_:126,$_) } unpack('C*',$_[0]->rbuf)), "]\n";
-            $handle->push_write($_[0]->rbuf);
-            $handle->push_write($BANNER);
-            $stats{sent_bytes} += length $_[0]->rbuf;
-            $stats{sent_bytes} += length $BANNER;
+
+            # TODO munge data
+
+            # line has been received
+            push @{ $clients{$curr_client}{lines} }, $_[0]->rbuf;
+
+            # clear input buffer - TODO partials
             $_[0]->rbuf = '';
         });
     $nclients++;
