@@ -94,6 +94,9 @@ sub accept_cb
 
     $handle->on_read( sub {
             $stats{recv_bytes} += length $_[0]->rbuf;
+            if ($_[0]->rbuf =~ /\@shutdown/) {
+                undef $quit_program;
+            }
             # print "($curr_client) Got: [", join(' ',map { sprintf("(%c(%d))",$_>=32&&$_<=126?$_:126,$_) } unpack('C*',$_[0]->rbuf)), "]\n";
             $handle->push_write($_[0]->rbuf);
             $handle->push_write($BANNER);
