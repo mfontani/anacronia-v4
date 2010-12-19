@@ -26,7 +26,6 @@ my %stats = (
     recv_bytes => 0,
     sent_bytes => 0,
 );
-my $t0 = [gettimeofday];
 
 my $BANNER =<<'END';
 In many MUDs commands are parsed and executed in a first-come first-served
@@ -50,6 +49,7 @@ tcp_server(undef, 8081, \&accept_cb, sub {
     warn "Listening on $thishost:$thisport\n";
 });
 
+my $t0 = [gettimeofday];
 my $w = AnyEvent->signal(
     signal => "INT",
     cb     => sub {
