@@ -58,7 +58,7 @@ my $w = AnyEvent->signal(
 
 my $tick_commands = AnyEvent->timer(
     after => 1.0,
-    interval => 0.1,
+    interval => 0.5,
     cb => sub {
         return unless keys %clients;
         my @deletion;
