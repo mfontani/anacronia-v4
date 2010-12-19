@@ -1,6 +1,7 @@
 package Av4::TelnetOptions;
+use strict;
+use warnings;
 use Av4::User;
-use Moose;
 use Compress::Zlib;
 use Av4::Utils qw/get_logger ansify/;
 use Av4::Telnet qw/
@@ -14,29 +15,35 @@ use Av4::Telnet qw/
   _256col
   /;
 
-## the user these telnet options negotiations refer to
-has 'user' => ( is => 'ro', isa => 'Av4::User', required => 1 );
+use Class::XSAccessor {
+    constructor => '_new',
+    accessors => [qw/user mccp terminaltype naws_w naws_h
+        state_iac state_do state_sb state_will
+        state_got_ttype state_ttype state_got_naws state_naws zstream/],
+};
 
-## negotiated options' values
-has 'mccp'         => ( is => 'rw', isa => 'Int', required => 1, default => 0 );
-has 'terminaltype' => ( is => 'rw', isa => 'Str', required => 1, default => 'undefined' );
-has 'naws_w'       => ( is => 'rw', isa => 'Int', required => 1, default => 0 );
-has 'naws_h'       => ( is => 'rw', isa => 'Int', required => 1, default => 0 );
-
-## State of the telnet state machine
-has 'state_iac'  => ( is => 'rw', isa => 'Int', required => 1, default => 0 );
-has 'state_do'   => ( is => 'rw', isa => 'Int', required => 1, default => -1 );
-has 'state_sb'   => ( is => 'rw', isa => 'Int', required => 1, default => -1 );
-has 'state_will' => ( is => 'rw', isa => 'Int', required => 1, default => -1 );
-
-## State of the options negotiations
-has 'state_got_ttype' => ( is => 'rw', isa => 'Int', required => 1, default => 0 );
-has 'state_ttype'     => ( is => 'rw', isa => 'Str', required => 1, default => '' );
-has 'state_got_naws'  => ( is => 'rw', isa => 'Int', required => 1, default => 0 );
-has 'state_naws' => ( is => 'rw', isa => 'ArrayRef[Int]', required => 1, default => sub { [] } );
-
-## MCCP zlib stream
-has 'zstream' => ( is => 'rw', isa => 'Any', required => 1, default => 0 );
+sub new {
+    my $class = shift;
+    $class->_new(
+        # defaults
+        user => '',
+        mccp => 0,
+        terminaltype => 'undefined',
+        naws_w => 0,
+        naws_h => 0,
+        state_iac => 0,
+        state_do => -1,
+        state_sb => -1,
+        state_will => 1,
+        state_got_ttype => 0,
+        state_ttype => '',
+        state_got_naws => 0,
+        state_naws => [],
+        zstream => 0,
+        # wanted options
+        @_,
+    );
+}
 
 sub send_data {
     my $self   = shift;
@@ -323,6 +330,4 @@ sub analyze {
     return $newdata;
 }
 
-__PACKAGE__->meta->make_immutable();
-no Moose;
 1;

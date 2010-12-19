@@ -1,18 +1,24 @@
 package Av4::Command;
-use Moose;
 use Av4::Utils qw/get_logger ansify/;
 
-has 'name'     => ( is => 'ro', isa => 'Str', required => 1 );
-has 'priority' => ( is => 'ro', isa => 'Int', required => 1, default => 0 );
-has 'delays'   => ( is => 'ro', isa => 'Int', required => 1, default => 0 );
-has 'code' => (
-    is       => 'ro',
-    isa      => 'CodeRef',
-    required => 1,
-    default  => sub {
-        sub { }
-    }
-);
+use Class::XSAccessor {
+    constructor => '_new',
+    accessors => [qw/name priority delays code/],
+
+};
+
+sub new {
+    my $class = shift;
+    $class->_new(
+        # defaults
+        name => '',
+        priority => 0,
+        delays => 0,
+        code => sub {},
+        # wanted options
+        @_,
+    );
+}
 
 sub exec {
     my $self = shift;
@@ -31,6 +37,4 @@ sub exec {
     return $rc;
 }
 
-no Moose;
-__PACKAGE__->meta->make_immutable();
 1;
