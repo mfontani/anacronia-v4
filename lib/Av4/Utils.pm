@@ -11,6 +11,9 @@ require Exporter;
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(get_logger ansify);
 
+our $hits   = 0;
+our $misses = 0;
+
 our $memd = new Cache::Memcached::Fast({
     servers => [
         {
@@ -32,7 +35,8 @@ sub ansify {
     my ($str,$status) = @_;
     my $md5 = md5_hex($str);
     my $hit = $memd->get($md5);
-    return $hit if $hit;
+    if ( $hit ) { $hits++ ; return $hit; }
+    $misses++;
     my $ansified = Av4::Ansi::ansify($str,$status);
     $memd->set($md5,$ansified);
     return $ansified;

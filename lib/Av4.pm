@@ -132,6 +132,8 @@ sub run {
         warn sprintf( "MUD data sent !mccp:  %20lu (%20.2f KiB/s)\n", $mud_data_sent_nonmccp,  $mud_data_sent_nonmccp / 1024 / $mud_uptime );
         warn sprintf( "MUD data sent mccp:   %20lu (%20.2f KiB/s)\n", $mud_data_sent_mccp,     $mud_data_sent_mccp /1024 / $mud_uptime );
         warn sprintf( "Processed %d commands in %d seconds: %2.2f commands/second\n",$cmd_processed,$mud_uptime,($cmd_processed/$mud_uptime));
+        warn sprintf( "Cache hits:           %d\n", $Av4::Utils::hits);
+        warn sprintf( "Cache misses:         %d\n", $Av4::Utils::misses);
         warn "Stopped now\n";
     }
 }
