@@ -6,7 +6,7 @@ use Av4::User;
 
 use Class::XSAccessor {
     constructor => '_new',
-    accessors => [ qw/helps inbuffer outbuffer clients kernel running/ ],
+    accessors => [ qw/helps inbuffer outbuffer clients running/ ],
 };
 
 sub new {
@@ -18,7 +18,6 @@ sub new {
         outbuffer => {},
         clients => [],
         running => 1,
-        kernel => undef,
         # wanted options
         @_,
     );

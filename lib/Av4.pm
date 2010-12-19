@@ -1,12 +1,14 @@
 package Av4;
 use strict;
 use warnings;
-use POSIX;
-use IO::Socket;
-use POE::Kernel { loop => 'POE::XS::Loop::EPoll' };
 
 # POE::XS::Queue::Array is used by default by POE if found
-use POE;
+use EV;
+use AnyEvent;
+use AnyEvent::Socket;
+use AnyEvent::Handle;
+use Time::HiRes qw/tv_interval gettimeofday/;
+
 use Log::Log4perl;
 use YAML;
 
@@ -46,6 +48,10 @@ our $tick_commands = 1.0;
 
 our $shutdown_connected = 0;
 
+our $server = undef;
+
+our $quit_program = AnyEvent->condvar;
+
 sub new {
     my $class = shift;
     my $opts  = {@_};
@@ -66,47 +72,129 @@ sub new {
         Log::Log4perl::init( \$conf );
     }
     my $self = {};
-    POE::Session->create(
-        inline_states => {
-            _start        => \&server_start,
-            event_accept  => \&server_accept,
-            event_read    => \&client_read,
-            event_write   => \&client_write,
-            event_error   => \&client_error,
-            event_quit    => \&client_quit,
-            event_done    => \&client_done,
-            tick_commands => \&tick_commands,
-            shutdown      => \&server_shutdown,
-        },
-        heap => $self,
-    ) if ( !$opts->{fake} );
-    my $server = Av4::Server->new(
-        helps  => Av4::HelpParse::areaparse($opts->{helpfile}),
-        kernel => $poe_kernel,
-    );
     $listen_port   = $opts->{listen_port}   if ( defined $opts->{listen_port} );
     $tick_commands = $opts->{tick_commands} if ( defined $opts->{tick_commands} );
-    $self->{server} = $server;
+    $self->{helpfile} = $opts->{helpfile};
     return bless $self, $class;
-}
-
-sub server {
-    my $self = shift;
-    $self->{server};
 }
 
 sub run {
     my $self    = shift;
     my $log     = get_logger();
-    my $CLRTEST = "&xx&rr&gg&yy&pp&bb&cc&ww &XX&RR&GG&YY&PP&BB&CC&WW";
-    $log->warn("TCP ready on port $listen_port");
-
-    #$log->debug($CLRTEST);
-    #$log->debug( ansify($CLRTEST) );
-    $mud_start = time();
-    $poe_kernel->run();
+    $server = Av4::Server->new(
+        helps  => Av4::HelpParse::areaparse($self->{helpfile}),
+    );
+    tcp_server(undef, $listen_port, \&server_accept_cb, sub {
+        my ($fh, $thishost, $thisport) = @_;
+        $log->warn("TCP ready on port $thisport");
+    });
+    my $w = AnyEvent->signal(
+        signal => "INT",
+        cb     => sub {
+            $quit_program->send('SIGINT');
+        }
+    );
+    $mud_start = [gettimeofday];
+    my $shutdown_by = $quit_program->recv;
+    my $mud_uptime = tv_interval($mud_start,[gettimeofday]);
+    warn "\n\nShut down by $shutdown_by\n";
+    warn sprintf( "Clients connected: $shutdown_connected\n" );
+    warn sprintf( "MUD chars sent:       %20lu (%20.2f b/s)\n",   $mud_chars_sent,         $mud_chars_sent / $mud_uptime );
+    warn sprintf( "MUD chars sent !mccp: %20lu (%20.2f b/s)\n",   $mud_chars_sent_nonmccp, $mud_chars_sent_nonmccp / $mud_uptime );
+    warn sprintf( "MUD chars sent mccp:  %20lu (%20.2f b/s)\n",   $mud_chars_sent_mccp,    $mud_chars_sent_mccp / $mud_uptime );
+    warn sprintf( "MUD data sent:        %20lu (%20.2f KiB/s)\n", $mud_data_sent,          $mud_data_sent / 1024 / $mud_uptime );
+    warn sprintf( "MUD data sent !mccp:  %20lu (%20.2f KiB/s)\n", $mud_data_sent_nonmccp,  $mud_data_sent_nonmccp / 1024 / $mud_uptime );
+    warn sprintf( "MUD data sent mccp:   %20lu (%20.2f KiB/s)\n", $mud_data_sent_mccp,     $mud_data_sent_mccp /1024 / $mud_uptime );
+    warn sprintf( "Processed %d commands in %d seconds: %2.2f commands/second\n",$cmd_processed,$mud_uptime,($cmd_processed/$mud_uptime));
+    warn sprintf( "Cache hits:           %d\n", $Av4::Utils::hits);
+    warn sprintf( "Cache misses:         %d\n", $Av4::Utils::misses);
+    warn "Stopped now\n";
     exit 0;
 }
+
+sub server_accept_cb {
+    my ($fh, $host, $port) = @_;
+    my $handle;
+    $handle = new AnyEvent::Handle(
+        fh => $fh,
+        on_error => \&client_error,
+        #sub {
+        #    warn "Error $_[2]";
+        #   $_[0]->destroy();
+        #},
+        on_eof => \&client_quit,
+        #sub {
+        #    warn "Goodbye client $curr_client\n";
+        #    delete $clients{$curr_client};
+        #    $handle->destroy; # destroy handle
+        #},
+    );
+    warn "Connection from $host:$port ($handle)\n";
+    my $new_user   = Av4::User->new(
+        id    => $handle,
+        queue => [],
+        server => $server,
+    );
+    push @{ $server->clients }, $new_user;
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_COMPRESS2 ) );
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_TTYPE ) );
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_NAWS ) );
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MSP ) );
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MXP ) );
+    $handle->push_write( '#$#mcp version: 2.1 to: 2.1' . "\r\n" );
+    $handle->push_write("Hi, Welcome to the MUD!\r\n\r\n"); # FIXME BANNER
+    $handle->push_write(sprintf "\33]0;Av4 - $handle\a");
+    $handle->on_read( \&client_read );
+    #sub {
+    #        $stats{recv_bytes} += length $_[0]->rbuf;
+    #        # TODO munge data
+    #        # line has been received
+    #        push @{ $clients{$curr_client}{lines} }, $_[0]->rbuf;
+    #        # clear input buffer - TODO partials
+    #        $_[0]->rbuf = '';
+    #    });
+    ();
+}
+
+sub client_read {
+    my $data = $_[0]->rbuf;
+    my $log = get_logger();
+    my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
+    die "Cant find user $_[0] in clients!" if ( !defined $user );
+
+    #__data_log( 'Received from', $client, $data );    # ONLY FOR DEBUG!
+    eval { $data = $user->received_data($data); };
+    if ($@) {
+        $log->error("Quitting client $_[0]: $@");
+        $_[0]->destroy;
+        return;
+    }
+    $server->inbuffer->{$_[0]} .= $data;
+    while ( $server->inbuffer->{$_[0]} =~ s/(.*\n)// ) {
+        my $typed = $1;
+        chomp($typed);
+        $typed =~ s/[\x0D\x0A]//gm;
+        if ( @{ $user->queue } > 80 && $typed !~ /^\s*quit/ ) {
+            $typed = 'quit';
+            $user->broadcast(
+                $_[0],
+                "&W$user &Gquits due to spamming\n\r",
+                "&WYou &Gquit due to SPAMMING!\n\r",
+                1,    # send prompt to others
+            );
+            $log->info("Client $_[0] SPAMMING (queue>80) ==> OUT!");
+        }
+        push @{ $user->queue }, $typed;
+        #$cmd_processed++;
+        #$typed =~ s/[\x00-\x19\x80-\xFF]//gi;
+        #$log->info( "Added to command stack for $client: `$typed`:\n\r" . Dump( $user->queue ) );
+    }
+
+    # commands are now dispatched via tick_commands
+}
+
+=for later
+
 {
     my $shutdown_by = '';
 
@@ -374,5 +462,8 @@ sub client_done {
     close $client;
     $log->info("Session ended for client $client");
 }
+
+=cut
+
 
 1;
