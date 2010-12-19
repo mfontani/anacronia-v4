@@ -145,6 +145,7 @@ sub server_accept_cb {
     $handle->push_write("Hi, Welcome to the MUD!\r\n\r\n"); # FIXME BANNER
     $handle->push_write(sprintf "\33]0;Av4 - $handle\a");
     $handle->on_read( \&client_read );
+    $new_user->print( $new_user->prompt );
     #sub {
     #        $stats{recv_bytes} += length $_[0]->rbuf;
     #        # TODO munge data

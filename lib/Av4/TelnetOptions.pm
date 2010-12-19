@@ -56,7 +56,8 @@ sub send_data {
         $Av4::mud_chars_sent_nonmccp += $lenout;
         $Av4::mud_data_sent          += $lenout;
         $Av4::mud_data_sent_nonmccp  += $lenout;
-        $self->user->server->outbuffer->{ $self->user->id } .= $$out;
+        #$self->user->server->outbuffer->{ $self->user->id } .= $$out;
+        $self->user->id->push_write($$out);
         return;
     }
     if ( !$self->zstream ) {
