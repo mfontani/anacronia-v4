@@ -1,0 +1,51 @@
+#!/usr/bin/env perl
+# vim: set filetype=perl :
+use strict;
+use warnings;
+
+use AnyEvent;
+use AnyEvent::Socket;
+use AnyEvent::Handle;
+
+my $quit_program = AnyEvent->condvar;
+
+my $nclients = 0;
+my %clients;
+
+#my $srv = tcp_server(undef, 8081, \&accept_cb, sub {
+tcp_server(undef, 8081, \&accept_cb, sub {
+    my ($fh, $thishost, $thisport) = @_;
+    warn "Listening on $thishost:$thisport\n";
+});
+
+$quit_program->recv;
+
+sub accept_cb
+{
+    my ($fh, $host, $port) = @_;
+    my $curr_client = $nclients;
+    warn "Connection from $host:$port ($curr_client)\n";
+    my $handle;
+    $handle = new AnyEvent::Handle(
+        fh => $fh,
+        on_error => sub {
+            warn "Error $_[2]";
+            $_[0]->destroy();
+        },
+        on_eof => sub {
+            warn "Goodbye client $curr_client\n";
+            delete $clients{$curr_client};
+            $handle->destroy; # destroy handle
+        },
+    );
+    $clients{$curr_client} = $fh;
+    #syswrite($fh,"Welcome\n");
+    $handle->push_write("Welcome\n");
+    $handle->on_read( sub {
+            print "($curr_client) Got: [", join(' ',map { sprintf("(%c(%d))",$_>=32&&$_<=126?$_:126,$_) } unpack('C*',$_[0]->rbuf)), "]\n";
+            $handle->push_write($_[0]->rbuf);
+            $_[0]->rbuf = '';
+        });
+    $nclients++;
+    ();
+}
