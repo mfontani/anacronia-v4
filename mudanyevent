@@ -43,7 +43,6 @@ specific queue types (attack, defense, movement) is on the roadmap and
 should be fairly easy to implement.
 END
 
-#my $srv = tcp_server(undef, 8081, \&accept_cb, sub {
 tcp_server(undef, 8081, \&accept_cb, sub {
     my ($fh, $thishost, $thisport) = @_;
     warn "Listening on $thishost:$thisport\n";
@@ -53,16 +52,16 @@ my $t0 = [gettimeofday];
 my $w = AnyEvent->signal(
     signal => "INT",
     cb     => sub {
-        my $secs = tv_interval($t0,[gettimeofday]);
-        print "\n\nShut down\n";
-        print "Received $stats{recv_bytes} bytes - ".sprintf("%05.3f",$stats{recv_bytes}/$secs)." bytes/sec\n";
-        print "Sent     $stats{sent_bytes} bytes - ".sprintf("%05.3f",$stats{sent_bytes}/$secs)." bytes/sec\n";
-        print "Total run time: $secs seconds\n";
-        exit 1;
+        $quit_program->send('SIGINT');
     }
 );
 
-$quit_program->recv;
+my $shutdown_by = $quit_program->recv;
+my $secs = tv_interval($t0,[gettimeofday]);
+print "\n\nShut down by $shutdown_by\n";
+print "Received $stats{recv_bytes} bytes - ".sprintf("%05.3f",$stats{recv_bytes}/$secs)." bytes/sec\n";
+print "Sent     $stats{sent_bytes} bytes - ".sprintf("%05.3f",$stats{sent_bytes}/$secs)." bytes/sec\n";
+print "Total run time: $secs seconds\n";
 
 sub accept_cb
 {
@@ -95,7 +94,10 @@ sub accept_cb
     $handle->on_read( sub {
             $stats{recv_bytes} += length $_[0]->rbuf;
             if ($_[0]->rbuf =~ /\@shutdown/) {
-                undef $quit_program;
+                #undef $quit_program;
+                $handle->push_write("Shutting down\n");
+                $quit_program->send("Shutdown by $curr_client");
+                return;
             }
             # print "($curr_client) Got: [", join(' ',map { sprintf("(%c(%d))",$_>=32&&$_<=126?$_:126,$_) } unpack('C*',$_[0]->rbuf)), "]\n";
             $handle->push_write($_[0]->rbuf);
