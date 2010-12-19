@@ -50,7 +50,7 @@ sub received_data {
 
 sub prompt {
     my $self = shift;
-    return sprintf("\r\n%s (%s) (delay %d) > \r\n", $self->id, $self->name, $self->delay) if $self->state == $STATE_PLAYING;
+    return sprintf("\r\n(%s) (delay %d) > \r\n", $self->name, $self->delay) if $self->state == $STATE_PLAYING;
     if ( $state_name{$self->state} eq 'CONNECTED' ) {
         return sprintf("\r\nHow would you like to be known as? > \r\n");
     }

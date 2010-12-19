@@ -24,7 +24,7 @@ sub cmd_shout {
     #$log->info("$client shouts $argstr");
     $user->broadcast(
         $client,
-        ansify("&r$client") . ansify(" shouts: ") . ansify("&W$argstr") . "\n\r",
+        ansify("&r" . $user->name) . ansify(" shouts: ") . ansify("&W$argstr") . "\n\r",
         ansify("&rYou shout: ") . ansify("&W$argstr") . "\n\r",
         1,    # send prompt to others
     );
