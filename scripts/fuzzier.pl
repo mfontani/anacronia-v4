@@ -4,16 +4,23 @@ use POE::Kernel { loop => 'POE::XS::Loop::EPoll' };
 use POE;
 use POE::Component::Client::TCP;
 use POE::Filter::Stream;
+use Getopt::Long;
 
-my $nclients = shift;
-$nclients = 80 if ( !defined $nclients );
-my $port = shift;
-$port = 8081 if ( !defined $port );
-my $host = shift;
-$host = 'localhost' if (!defined $host);
+my $nclients = 80;
+my $host     = '127.0.0.1';
+my $port     = 8081;
+my $mccp     = 0;
+
+GetOptions(
+    'clients=i' => \$nclients,
+    'host=s'    => \$host,
+    'port=i'    => \$port,
+    'mccp'      => \$mccp,
+);
 
 # Spawn N clients
 warn "Spawning $nclients clients...\n";
+warn "Will fake MCCP\n" if $mccp;
 my $commands = 0;
 my $begin    = time;
 
@@ -24,6 +31,7 @@ foreach my $clin ( 1 .. $nclients ) {
         Filter        => "POE::Filter::Stream",
         Connected     => sub {
 
+            $_[HEAP]->{server}->put(sprintf("%c%c%c",255,253,86)) if $mccp; # IAC DO COMPRESS2
             #print "Client $clin connected to $host:$port ...\n";
             $_[HEAP]->{banner_buffer} = [];
             $_[KERNEL]->delay( send_enter => int rand(3) + 1 );
