@@ -38,7 +38,7 @@ foreach my $clin ( 1 .. $nclients ) {
             #print "Client $clin got input from $host:$port ...\n";
             push @{ $heap->{banner_buffer} }, $input;
             #$kernel->delay( send_stuff    => 0);
-            $kernel->delay( input_timeout => rand(2) + 1 );
+            $kernel->delay( input_timeout => rand(1) + 1 );
         },
         InlineStates => {
             send_stuff => sub {
@@ -49,7 +49,7 @@ foreach my $clin ( 1 .. $nclients ) {
                     $_[KERNEL]->yield("shutdown");
                     return;
                 }
-                $_[KERNEL]->delay( input_timeout => rand(2) + 1 );
+                $_[KERNEL]->delay( input_timeout => rand(1) + 1 );
                 $_[HEAP]->{server}->put( rand_command() );
                 $commands++;
             },
@@ -61,7 +61,7 @@ foreach my $clin ( 1 .. $nclients ) {
                     $kernel->yield("shutdown");
                     return;
                 }
-                $_[KERNEL]->delay( send_stuff    => rand(2) + 1 );
+                $_[KERNEL]->delay( send_stuff    => rand(1) + 1 );
                 $_[HEAP]->{server}->put( rand_command() );
                 $commands++;
             },
