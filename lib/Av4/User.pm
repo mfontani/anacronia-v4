@@ -131,6 +131,8 @@ sub state_get_name {
     my ( $self, $kernel ) = @_;
     my $log = get_logger(1);
     my $name = shift @{$self->queue};
+    chomp($name);
+    $name =~ s/[\x0D\x0A]+//g;
     $self->name($name);
     $self->state( $self->state + 1 );
     $self->print( ansify( sprintf("\n\r&YYou will be known as &c'&W%s&^&c'\r\n",$name) ) );
