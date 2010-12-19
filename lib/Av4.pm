@@ -256,6 +256,13 @@ sub tick_commands {
     #$_[KERNEL]->delay( tick_commands => $tick_commands );
 }
 
+sub shutdown {
+    my ( $self, $bywho ) = @_;
+    my $shutdown_by = $bywho->id;
+    broadcast($bywho->id,"$shutdown_by initiated shutdown...\n",0);
+    $quit_program->send($shutdown_by);
+}
+
 =for later
 
 {
