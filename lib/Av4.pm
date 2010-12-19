@@ -193,6 +193,32 @@ sub client_read {
     # commands are now dispatched via tick_commands
 }
 
+sub client_error {
+    my $log = get_logger();
+    $_[0]->destroy();
+    broadcast(
+        $_[0],
+        "&W$_[0] &Gquits the MUD due to errors $_[2]\n\r",
+        1,                                       # send prompt to others
+    );
+    $log->warn("$_[0] quits due to errors: $_[2]\n");
+}
+
+sub broadcast {
+    my ( $by, $message, $sendprompt ) = @_;
+    my $log = get_logger();
+    $log->info("(by $by) Server broadcast: $message");
+    $sendprompt = 0 if ( !defined $sendprompt );
+
+    # Send it to everyone.
+    foreach my $user ( @{ $server->clients } ) {
+        next if ( !defined $user );
+        #$log->info("Sending broadcast to client $user");
+        $user->print( ansify( $message ));
+        $user->print( $user->prompt ) if ($sendprompt);
+    }
+}
+
 =for later
 
 {

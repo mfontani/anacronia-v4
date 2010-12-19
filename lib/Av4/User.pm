@@ -61,7 +61,9 @@ sub prompt {
 
 sub print {
     my $self = shift;
-    $self->telopts->send_data(\$_) for @_;
+    return unless defined $self->id;
+    $self->id->push_write($_) for @_;
+    #$self->telopts->send_data(\$_) for @_;
     #my $out = join( '', @_ );
     #$self->telopts->send_data(\$out);
 }
