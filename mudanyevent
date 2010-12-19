@@ -3,9 +3,17 @@
 use strict;
 use warnings;
 
+use lib './lib';
+
 use AnyEvent;
 use AnyEvent::Socket;
 use AnyEvent::Handle;
+
+use Av4::Telnet qw/%TELOPTS %TELOPTIONS TELOPT_FIRST
+    TELOPT_WILL TELOPT_WONT TELOPT_DO TELOPT_DONT
+    TELOPT_IAC TELOPT_SB TELOPT_SE TELOPT_COMPRESS2
+    TELOPT_TTYPE TELOPT_NAWS TELOPT_MSP TELOPT_MXP
+    _256col/;
 
 my $quit_program = AnyEvent->condvar;
 
@@ -39,8 +47,15 @@ sub accept_cb
         },
     );
     $clients{$curr_client} = $fh;
-    #syswrite($fh,"Welcome\n");
-    $handle->push_write("Welcome\n");
+
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_COMPRESS2 ) );
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_TTYPE ) );
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_NAWS ) );
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MSP ) );
+    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MXP ) );
+    $handle->push_write( '#$#mcp version: 2.1 to: 2.1' . "\r\n" );
+    $handle->push_write("Hi, Welcome to the MUD!\r\n\r\n"); # FIXME BANNER
+
     $handle->on_read( sub {
             print "($curr_client) Got: [", join(' ',map { sprintf("(%c(%d))",$_>=32&&$_<=126?$_:126,$_) } unpack('C*',$_[0]->rbuf)), "]\n";
             $handle->push_write($_[0]->rbuf);
