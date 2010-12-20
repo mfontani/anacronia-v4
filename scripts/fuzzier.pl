@@ -79,6 +79,7 @@ my @commands = qw/help shout say help who shout help stats shout help say help a
 my @helps    = qw/map help massign bede cod cry1 cry2 cry3 cry10/;
 
 sub rand_command {
+    return (int(rand(2))?"shout power ":"power ") . int(rand(9000)) . "\r\n";
     my $cmd = ( rand @commands ) + 2;
     my $ret = $commands[ rand @commands ];
     $ret .= ' ';
