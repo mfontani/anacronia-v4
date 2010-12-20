@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use Av4::Command;
 use Av4::Commands::Basic;
+use Av4::Commands::Delegated;
 use Av4::Commands::MCP;
 
 use Class::XSAccessor {
@@ -23,6 +24,7 @@ sub new {
     $self->_add_mcp_commands();
     $self->_add_basic_commands();
     $self->_add_admin_commands();
+    $self->_add_delegated_commands();
     $self;
 }
 
@@ -173,6 +175,19 @@ sub _add_basic_commands {
             priority => 999,
             code     => \&Av4::Commands::Basic::cmd_quit,
             delays   => 0,
+        )
+    );
+}
+
+sub _add_delegated_commands {
+    my $self = shift;
+    $self->cmd_set(
+        'power',
+        Av4::Command->new(
+            name     => 'power',
+            priority => 1,
+            code     => \&Av4::Commands::Delegated::cmd_power,
+            delays => 5,
         )
     );
 }
