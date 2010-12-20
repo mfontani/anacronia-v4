@@ -6,6 +6,7 @@ use EV;
 use AnyEvent;
 use AnyEvent::Socket;
 use AnyEvent::Handle;
+use AnyEvent::Gearman::Client;
 use Time::HiRes qw/tv_interval gettimeofday/;
 
 use Log::Log4perl;
@@ -48,6 +49,8 @@ our $tick_commands = 1.0;
 our $shutdown_connected = 0;
 
 our $server = undef;
+
+our $gearman = AnyEvent::Gearman::Client->new(job_servers => ['127.0.0.1'],);
 
 our $quit_program = AnyEvent->condvar;
 
