@@ -24,7 +24,7 @@ sub exec {
     my $self = shift;
     my ( $client, $user, $argstr ) = @_;
 
-    $user->print( ansify( "&gCommand: &c" . $self->name . " &C$argstr\r\n" ) )
+    $user->print( ansify( "&gCommand: &c" ) . $self->name . ansify(" &C") . "$argstr" . ansify("&^\r\n") )
       unless (
         $self->name =~ /^\#\$\#/    # MCP commands
         || $self->name =~ /^\@/     # wiz commands
