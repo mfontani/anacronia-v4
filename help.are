@@ -7,6 +7,21 @@ Syntax: !
 It is NOT implemented.
 ~
 
+0 HELP~
+To use the help facility, type:
+
+    &Whelp &R<keyword>&^
+
+For example, "help anacronia".
+
+For a (long) list of help topics, type:
+
+    &Whlist <free text>&^
+
+You can use hlist to narrow down the list of pages to the ones which contain
+the text you specify. For example, "hlist v4" would show the help pages which
+contain that word.  ~
+
 0 ANACRONIA V4~
 &WAnacronia V4&^ is the fourth rewrite of a Multi User Dungeon (MUD), a multi-user
 internet gaming system. It is written in the Perl programming language, and
