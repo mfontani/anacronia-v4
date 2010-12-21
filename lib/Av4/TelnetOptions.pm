@@ -12,15 +12,16 @@ use Av4::Telnet qw/
   TELOPT_IAC TELOPT_SB TELOPT_SE
   TELOPT_COMPRESS2
   TELOPT_TTYPE TELOPT_NAWS
+  TELOPT_MXP
   _256col
   /;
 
-sub DEBUGTELNETOPTS { 0 }
+sub DEBUGTELNETOPTS { 1 }
 
 use Class::XSAccessor {
     constructor => '_new',
     accessors => [qw/user mccp terminaltype naws_w naws_h
-        state_iac state_do state_sb state_will
+        state_iac state_do state_sb state_will mxp
         state_got_ttype state_ttype state_got_naws state_naws zstream/],
 };
 
@@ -30,6 +31,7 @@ sub new {
         # defaults
         user => '',
         mccp => 0,
+        mxp => 0,
         terminaltype => 'undefined',
         naws_w => 0,
         naws_h => 0,
@@ -201,12 +203,22 @@ sub analyze {
                     if ( ord $char == TELOPT_COMPRESS2 ) {
                         $self->mccp2start();
                         $log->info( "Client ", $self->user, " OK COMPRESS2 STARTS" ) if DEBUGTELNETOPTS;
+                    } elsif ( ord $char == TELOPT_MXP ) {
+                        $log->info( "Client ", $self->user, " OK MXP STARTS" ) if DEBUGTELNETOPTS;
+                        $self->user->print( sprintf(
+                            "%c%c%c%c%c", 255, 250, TELOPT_MXP, 255, 240    # IAC SB MXP IAC SE
+                        ));
+                        $self->user->print( "\e[7z" ); # lock locked mode
+                        $self->mxp(1);
                     }
                 } elsif ( $self->state_do == 0 ) {
                     $log->debug( " => IAC DONT ", $TELOPTIONS{ ord $char } ) if DEBUGTELNETOPTS;
                     if ( ord $char == TELOPT_COMPRESS2 ) {
                         $self->mccp2end();
                         $log->info( "Client ", $self->user, "OK COMPRESS2 STOP" ) if DEBUGTELNETOPTS;
+                    } elsif ( ord $char == TELOPT_MXP ) {
+                        $self->mxp(0);
+                        $log->info( "Client ", $self->user, "OK MXP STOP" ) if DEBUGTELNETOPTS;
                     }
                 } elsif ( $self->state_will == 1 ) {
                     $log->debug(" => IAC WILL!!") if DEBUGTELNETOPTS;

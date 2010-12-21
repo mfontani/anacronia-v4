@@ -5,6 +5,7 @@ use Av4::Command;
 use Av4::Commands::Basic;
 use Av4::Commands::Delegated;
 use Av4::Commands::MCP;
+use Av4::Commands::MXP;
 
 use Class::XSAccessor {
     constructor => '_new',
@@ -22,6 +23,7 @@ sub new {
         @_,
     );
     $self->_add_mcp_commands();
+    $self->_add_mxp_commands();
     $self->_add_basic_commands();
     $self->_add_admin_commands();
     $self->_add_delegated_commands();
@@ -48,6 +50,21 @@ sub exists {
     $which = lc $which;
     my $it = $self->cmd_get($which);
     return defined $it;
+}
+
+sub _add_mxp_commands {
+    my $self = shift;
+
+    # @mxp TEXT
+    $self->cmd_set(
+        '@mxp',
+        Av4::Command->new(
+            name     => '@mxp',
+            priority => 10,
+            code     => \&Av4::Commands::MXP::cmd_mxp,
+            delays   => 0,
+        ),
+    );
 }
 
 sub _add_mcp_commands {

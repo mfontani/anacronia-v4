@@ -175,6 +175,12 @@ sub dispatch_command {
     my $highest_priority_delaying    = -999;
     my $highest_priority_nondelaying = -999;
     foreach my $lineno ( 0 .. $#{ $self->queue } ) {
+        if ( $self->queue->[$lineno] =~ /^\e\[\dz/ )
+        {
+            Av4::Commands::MXP::cmd_mxp_option( $self->id, $self, $self->queue->[$lineno] );
+            delete $self->queue->[$lineno];
+            next;
+        }
         my ( $cmd, $args ) = split( /\s/, $self->queue->[$lineno], 2 );
         #$log->info(
         #    "Queue line $lineno: cmd >",

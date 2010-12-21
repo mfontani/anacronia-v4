@@ -61,9 +61,10 @@ sub cmd_who {
         next if ( !defined $plr );
         $user->print(
             sprintf(
-                "%-30s %-20s %s %s %s\r\n",
+                "%-30s %-20s %s %s %s %s\r\n",
                 ansify("&r$plr"),
                 ansify("&y" . $plr->name),
+                $plr->telopts->mxp           ? ansify('&gMXP ') : ansify('&R!MXP'),
                 $plr->telopts->mccp          ? ansify('&gMCCP ') : ansify('&R!MCCP'),
                 $plr->mcp_authentication_key ? ansify('&gMCP  ')  : ansify('&R!MCP '),
                 ($plr->telopts->naws_w && $plr->telopts->naws_h) ? ansify(sprintf('&gNAWS %dx%d',$plr->telopts->naws_w,$plr->telopts->naws_h)) : ansify('&R!NAWS'),
@@ -125,6 +126,11 @@ sub cmd_stats {
         );
     } else {
         $user->print(" Your terminal does not support sending NAWS on window resize\r\n");
+    }
+    if ( $user->telopts->mxp ) {
+        $user->print( ' ', ansify("&gYou are using MXP\r\n") );
+    } else {
+        $user->print( ' ', ansify("&rYou are NOT using MXP\r\n") );
     }
     if ( $user->telopts->mccp ) {
         $user->print( ' ', ansify("&gYou are using MCCP\r\n") );
