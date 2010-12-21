@@ -23,9 +23,10 @@ the text you specify. For example, "hlist v4" would show the help pages which
 contain that word.  ~
 
 0 ANACRONIA V4~
-&WAnacronia V4&^ is the fourth rewrite of a Multi User Dungeon (MUD), a multi-user
-internet gaming system. It is written in the Perl programming language, and
-uses "modern" technologies and modules, such as POE, Moose, and Memcache.
+&WAnacronia V4&^ is the fourth rewrite of a Multi User Dungeon (MUD), a
+multi-user internet gaming system. It is written in the Perl programming
+language, and uses "modern" technologies and modules, such as AnyEvent,
+Gearman, and Memcache.
 
 Anacronia v4 - Copyright (c) 2009,2010 Marco Fontani - MFONTANI at CPAN dot ORG
 Released under the GPL v.3.0 license
