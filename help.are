@@ -8,7 +8,7 @@ It is NOT implemented.
 ~
 
 0 ANACRONIA V4~
-^y&WAnacronia V4&^ is the fourth rewrite of a Multi User Dungeon (MUD), a multi-user
+&WAnacronia V4&^ is the fourth rewrite of a Multi User Dungeon (MUD), a multi-user
 internet gaming system. It is written in the Perl programming language, and
 uses "modern" technologies and modules, such as POE, Moose, and Memcache.
 
