@@ -153,8 +153,8 @@ sub server_accept_cb {
     $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MSP ) );
     $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MXP ) );
     $handle->push_write( '#$#mcp version: 2.1 to: 2.1' . "\r\n" );
-    my $banner = eval { Av4::HelpParse::areahelp( $new_user->server->helps, '__WELCOME__SCREEN__' )->data }
-        or "Hi, Welcome to the MUD!\r\n";
+    my $banner = eval { Av4::HelpParse::areahelp( $new_user->server->helps, '__WELCOME__SCREEN__' )->data };
+    $banner = "Hi, Welcome to the MUD!\r\n" if !defined $banner;
     $banner .= "\r\n";
     $handle->push_write($banner);
     $handle->on_read( \&client_read );
