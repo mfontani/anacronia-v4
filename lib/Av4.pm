@@ -191,8 +191,8 @@ sub client_read {
             $typed = 'quit';
             $user->broadcast(
                 $_[0],
-                "&W$user &Gquits due to spamming\n\r",
-                "&WYou &Gquit due to SPAMMING!\n\r",
+                ansify("&W") . "$user " . ansify("&G") . "quits due to spamming" . ansify("\n\r"),
+                ansify("&W") . "You "   . ansify("&G") . "quit due to SPAMMING!" . ansify("\n\r"),
                 1,    # send prompt to others
             );
             warn("Client $_[0] SPAMMING (queue>80) ==> OUT!\n");
@@ -210,7 +210,8 @@ sub client_error {
     $_[0]->destroy();
     broadcast(
         $_[0],
-        "&W$_[0] &Gquits the MUD due to errors $_[2]\n\r",
+        ansify("&W") . "$_[0] " . ansify("&G") . "quits the MUD due to errors $_[2]" . ansify("\n\r"),
+        '',
         1,                                       # send prompt to others
     );
     warn("$_[0] quits due to errors: $_[2]\n");
@@ -224,7 +225,7 @@ sub broadcast {
     # Send it to everyone.
     foreach my $user ( @{ $server->clients } ) {
         next if ( !defined $user );
-        $user->print( ansify( $message ));
+        $user->print( $message );
         $user->print( $user->prompt ) if ($sendprompt);
     }
 }
