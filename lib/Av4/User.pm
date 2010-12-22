@@ -137,10 +137,11 @@ sub state_get_name {
     $self->state( $self->state + 1 );
     $self->print( sprintf("\n\r%s %s\r\n",ansify("&YYou will be known as"),ansify("&c'&W$name&^&c'")) );
     $self->print( sprintf "\33]0;Av4 - %s\a", "\Q$name\E" ); # sets terminal title
+    $self->print("\r\n");
     $self->broadcast(
         $self->id,
         ansify("&W\Q$name\E").' '.ansify("&Ghas entered the MUD") . "\n\r",
-        ansify("&WYou &Ghave entered the MUD") . "\n\r",
+        ansify("&WYou") . ' ' . ansify("&ghave entered the MUD") . ansify("\n\r"),
         1,    # send prompt to others
     );
     $self->print( $self->prompt );
