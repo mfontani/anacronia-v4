@@ -2,6 +2,7 @@ package Av4::Commands::Basic;
 require Av4;
 require Av4::HelpParse;
 use Av4::Utils qw/get_logger ansify/;
+use Av4::Telnet qw/_256col/;
 require Exporter;
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(cmd_shout cmd_commands cmd_debug cmd_help cmd_quit);
@@ -50,6 +51,7 @@ sub cmd_colors {
         $output .= "\r\n";
     }
     $user->print( ansify($output) );
+    $user->print(_256col());
 }
 
 sub cmd_who {
