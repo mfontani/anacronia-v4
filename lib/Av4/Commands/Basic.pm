@@ -58,22 +58,22 @@ sub cmd_who {
     my ( $client, $user, $argstr ) = @_;
     $argstr = '' if ( $argstr =~ /^\s*$/ );
     my $log = get_logger();
-    $user->print( ansify( "&g" . '#' x 32 . ' ONLINE ' . '#' x 32 . "\r\n" ) );
+    $user->print( ansify( "&g" ) . '#' x 32 . ' ONLINE ' . '#' x 32 . ansify("\r\n") );
     foreach my $plr ( @{ $user->server->clients } ) {
         next if ( !defined $plr );
         $user->print(
             sprintf(
                 "%-30s %-20s %s %s %s %s\r\n",
-                ansify("&r$plr"),
-                ansify("&y" . $plr->name),
-                $plr->telopts->mxp           ? ansify('&gMXP ') : ansify('&R!MXP'),
+                ansify("&r") . "$plr",
+                ansify("&y") . $plr->name,
+                $plr->telopts->mxp           ? ansify('&gMXP  ') : ansify('&R!MXP '),
                 $plr->telopts->mccp          ? ansify('&gMCCP ') : ansify('&R!MCCP'),
-                $plr->mcp_authentication_key ? ansify('&gMCP  ')  : ansify('&R!MCP '),
+                $plr->mcp_authentication_key ? ansify('&gMCP  ') : ansify('&R!MCP '),
                 ($plr->telopts->naws_w && $plr->telopts->naws_h) ? ansify(sprintf('&gNAWS %dx%d',$plr->telopts->naws_w,$plr->telopts->naws_h)) : ansify('&R!NAWS'),
             )
         );
     }
-    $user->print( ansify( sprintf "&g%d users total.\r\n", scalar @{ $user->server->clients } ) );
+    $user->print( ansify('&g') . sprintf("%d users total.", scalar @{ $user->server->clients }) . ansify("\r\n") );
 }
 
 sub cmd_commands {
