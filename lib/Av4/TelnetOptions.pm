@@ -53,7 +53,6 @@ sub send_data {
     my $self   = shift;
     my $out    = shift;
     my $lenout = length $$out;
-    my $log  = get_logger();
     if ( !$self->mccp ) {
         #$log->trace( "Sending data to client ", $self->user, " via plain text" );
         $Av4::mud_chars_sent         += $lenout;
@@ -65,13 +64,13 @@ sub send_data {
         return;
     }
     if ( !$self->zstream ) {
-        $log->error( "Client ", $self->user, " has MCCP enabled but no zstream!" );
+        warn( "Client ", $self->user, " has MCCP enabled but no zstream!\n" );
         $self->user->server->kernel->yield( event_error => $self->user->id );
         return;
     }
     my ( $outdeflate, $deflatestatus ) = $self->zstream->deflate($$out);
     if ( !defined $outdeflate ) {
-        $log->error( "Client ", $self->user, ": undefined deflate: status ", $deflatestatus );
+        warn( "Client ", $self->user, ": undefined deflate: status ", $deflatestatus, "\n");
         $self->user->server->kernel->yield( event_error => $self->user->id );
         return;
     }
@@ -89,16 +88,16 @@ sub send_data {
     $self->user->id->push_write($outdeflate);
     my ( $outflush, $flushstatus ) = $self->zstream->flush(Z_SYNC_FLUSH);
     if ( !defined $outflush ) {
-        $log->error( "Client ", $self->user, ": undefined flush: status ", $flushstatus );
+        warn( "Client ", $self->user, ": undefined flush: status ", $flushstatus,"\n");
         $self->user->server->kernel->yield( event_error => $self->user->id );
         return;
     }
-    $log->debug(
-        "Client ", $self->user,
-        " via mccp, flushed is ",
-        length $outflush,
-        "; added to buffer!"
-    );
+    #$log->debug(
+    #    "Client ", $self->user,
+    #    " via mccp, flushed is ",
+    #    length $outflush,
+    #    "; added to buffer!"
+    #);
     $Av4::mud_data_sent      += length $outflush;
     $Av4::mud_data_sent_mccp += length $outflush;
     $self->user->server->outbuffer->{ $self->user->id } .= $outflush;
@@ -108,42 +107,40 @@ sub send_data {
 
 sub mccp2start {
     my $self = shift;
-    my $log  = get_logger();
-    $log->info( "Sending IAC SB COMPRESS2 IAC SE to client ", $self->user );
+    ### Sending IAC SB COMPRESS2 IAC SE to client $self->user
     $self->user->id->push_write( sprintf(
         "%c%c%c%c%c", 255, 250, 86, 255, 240    # IAC SB COMPRESS2 IAC SE
     ));
-    $log->info( "Creating ZStream for client ", $self->user );
+    ### Creating ZStream for client $self->user
     my ( $d, $initstatus ) = deflateInit( -Level => Z_BEST_COMPRESSION );
     if ( !defined $d ) {
-        $log->error( "Client ", $self->user, ": undefined deflateInit: status ", $initstatus );
+        warn( "Client ", $self->user, ": undefined deflateInit: status ", $initstatus, "\n");
         $self->user->server->kernel->yield( event_error => $self->user->id );
         return;
     }
     $self->zstream($d);
     $self->mccp(1);
-    $log->info( "MCCP==1 now for client ", $self->user );
+    ### MCCP on for client $self->user
 }
 
 sub mccp2end {
     my $self = shift;
-    my $log  = get_logger();
-    $log->info( "Client ", $self->user, " wants to end compression" );
+    ### Client $self->user wants to end compression
     if ( !$self->mccp ) {
-        $log->info( "Client ", $self->user,
-            " wants to end compression => doesnt have MCCP enable, exiting" );
+        ### .. and doesn't have MCCP enabled, umph!
         return;
     }
     $self->zstream(0);
     $self->mccp(0);
-    $log->info( "MCCP==0 now for client ", $self->user );
+    ### MCCP off for $self->user
 }
 
 ## does thet telnet magic
 sub analyze {
     my ( $self, $data ) = @_;
     my $newdata = '';
-    my $log     = get_logger();
+    my $log;
+    $log = get_logger() if DEBUGTELNETOPTS;
     $log->debug( "_analyze_data: str length ", length $data ) if DEBUGTELNETOPTS;
     my $charno = 0;
 
@@ -161,7 +158,7 @@ sub analyze {
                 $log->debug("IAC\n") if DEBUGTELNETOPTS;
                 next;
             } elsif ( ord $char >= TELOPT_FIRST ) {
-                $log->warn( "Client ", $self->user, ": shouldn't have received this (!IAC, >240)" );
+                warn( "Client ", $self->user, ": shouldn't have received this (!IAC, >240)" );
                 die "&RGarbage character received; Closing connection\r\n";
             }
             $newdata .= $char;
@@ -169,7 +166,7 @@ sub analyze {
         } elsif ( $self->state_iac == 1 ) {    # Got IAC, waiting on DO/DONT, etc
             $log->trace('$iac == 1') if DEBUGTELNETOPTS;
             if ( ord $char < TELOPT_FIRST ) {
-                $log->warn( "Client ", $self->user,
+                warn( "Client ", $self->user,
                     ": shouldn't have received this (IAC=1, <240)" );
                 die "&RGarbage character received; Closing connection\r\n";
             } elsif ( defined $TELOPTS{ ord $char } ) {
@@ -252,7 +249,7 @@ sub analyze {
                     next;
                 }
             } else {
-                $log->info( "Client ", $self->user, " unknown telnet option ", ord $char );
+                warn( "Client ", $self->user, " unknown telnet option ", ord $char, "\n");
             }
             $self->state_will(-1);
             $self->state_do(-1);
@@ -325,8 +322,8 @@ sub analyze {
                         }
                     }
                 } else {
-                    $log->debug(' => IAC SB UNKNOWN IAC !SE');
-                    $log->warn( "Client ", $self->user,
+                    warn(' => IAC SB UNKNOWN IAC !SE');
+                    warn( "Client ", $self->user,
                         ": shouldn't have received this (IAC=1, <240)" );
                     die "Garbage character received; Closing connection\r\n";
                 }
@@ -340,7 +337,7 @@ sub analyze {
             }
             next;
         }
-        $log->fatal('die(help!)');
+        warn("Dying: help!");
         die('help!');
     }
     $newdata =~ s/\x00//g;
