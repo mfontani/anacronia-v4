@@ -82,13 +82,12 @@ sub new {
 
 sub run {
     my $self    = shift;
-    my $log     = get_logger();
     $server = Av4::Server->new(
         helps  => Av4::HelpParse::areaparse($self->{helpfile}),
     );
     tcp_server(undef, $listen_port, \&server_accept_cb, sub {
         my ($fh, $thishost, $thisport) = @_;
-        $log->warn("TCP ready on port $thisport");
+        warn("TCP ready on port $thisport\n");
     });
     my $w = AnyEvent->signal(
         signal => "INT",
@@ -173,14 +172,13 @@ sub server_accept_cb {
 sub client_read {
     my $data = $_[0]->rbuf;
     $_[0]->rbuf = '';
-    my $log = get_logger();
     my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
     die "Cant find user $_[0] in clients!" if ( !defined $user );
 
     #__data_log( 'Received from', $client, $data );    # ONLY FOR DEBUG!
     eval { $data = $user->received_data($data); };
     if ($@) {
-        $log->error("Quitting client $_[0]: $@");
+        warn("Quitting client $_[0]: $@\n");
         $_[0]->destroy;
         return;
     }
@@ -197,7 +195,7 @@ sub client_read {
                 "&WYou &Gquit due to SPAMMING!\n\r",
                 1,    # send prompt to others
             );
-            $log->info("Client $_[0] SPAMMING (queue>80) ==> OUT!");
+            warn("Client $_[0] SPAMMING (queue>80) ==> OUT!\n");
         }
         push @{ $user->queue }, $typed;
         #$cmd_processed++;
@@ -209,26 +207,23 @@ sub client_read {
 }
 
 sub client_error {
-    my $log = get_logger();
     $_[0]->destroy();
     broadcast(
         $_[0],
         "&W$_[0] &Gquits the MUD due to errors $_[2]\n\r",
         1,                                       # send prompt to others
     );
-    $log->warn("$_[0] quits due to errors: $_[2]\n");
+    warn("$_[0] quits due to errors: $_[2]\n");
 }
 
 sub broadcast {
     my ( $by, $message, $sendprompt ) = @_;
-    my $log = get_logger();
-    $log->info("(by $by) Server broadcast: $message");
+    ## $log->info("(by $by) Server broadcast: $message");
     $sendprompt = 0 if ( !defined $sendprompt );
 
     # Send it to everyone.
     foreach my $user ( @{ $server->clients } ) {
         next if ( !defined $user );
-        #$log->info("Sending broadcast to client $user");
         $user->print( ansify( $message ));
         $user->print( $user->prompt ) if ($sendprompt);
     }
@@ -272,7 +267,6 @@ sub shutdown {
 }
 
 sub client_quit {
-    #my $log = get_logger();
     broadcast(
         "&W$_[0] &Gquits the MUD\n\r",
         1,    # send prompt to others
