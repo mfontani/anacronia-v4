@@ -253,7 +253,7 @@ sub dispatch_command {
             $self->print( $self->prompt ) if ( $cmd !~ /^\s*quit\s*$/ );
             $log->debug("***DISPATCHED/DELETING $cmd $args");
 
-            $self->prompttimer(AnyEvent->timer( after => $self->delay, cb => sub { $self->print( $self->prompt() ) }));
+            $self->prompttimer(AnyEvent->timer( after => $self->delay, cb => sub { $self->print( $self->prompt() ) })) if $self->delay;
 
             #push @effectively_dispatched, "$cmd $args";
             my $command_dispatched = $self->queue->[$lineno];
