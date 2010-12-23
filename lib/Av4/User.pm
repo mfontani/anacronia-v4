@@ -9,7 +9,7 @@ use YAML;
 
 use Class::XSAccessor {
     constructor => '_new',
-    accessors => [qw/server id state name telopts mcp_authentication_key mcp_packages_supported commands commands_dispatched queue delay/],
+    accessors => [qw/server id state name telopts mcp_authentication_key mcp_packages_supported commands commands_dispatched queue delay prompttimer/],
 };
 
 sub new {
@@ -252,6 +252,8 @@ sub dispatch_command {
 
             $self->print( $self->prompt ) if ( $cmd !~ /^\s*quit\s*$/ );
             $log->debug("***DISPATCHED/DELETING $cmd $args");
+
+            $self->prompttimer(AnyEvent->timer( after => $self->delay, cb => sub { $self->print( $self->prompt() ) }));
 
             #push @effectively_dispatched, "$cmd $args";
             my $command_dispatched = $self->queue->[$lineno];
