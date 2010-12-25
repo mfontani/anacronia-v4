@@ -165,11 +165,17 @@ sub analyze {
             next;
         } elsif ( $self->state_iac == 1 ) {    # Got IAC, waiting on DO/DONT, etc
             $log->trace('$iac == 1') if DEBUGTELNETOPTS;
-            if ( ord $char < TELOPT_FIRST ) {
-                warn( "Client ", $self->user,
-                    ": shouldn't have received this (IAC=1, <240)" );
-                die "&RGarbage character received; Closing connection\r\n";
-            } elsif ( defined $TELOPTS{ ord $char } ) {
+            if ( ord $char == TELOPT_IAC ) { # IAC IAC => IAC
+                $newdata .= $char;
+                $self->state_iac(0);
+                next;
+            }
+            #if ( ord $char < TELOPT_FIRST ) {
+            #    warn( "Client ", $self->user,
+            #        ": shouldn't have received this (IAC=1, <240)" );
+            #    die "&RGarbage character received; Closing connection\r\n";
+            #} els
+            if ( defined $TELOPTS{ ord $char } ) {
                 if ( ( ord $char >= TELOPT_WILL && ord $char <= TELOPT_DONT )
                     || ord $char == TELOPT_SB )
                 {
