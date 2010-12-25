@@ -157,9 +157,9 @@ sub analyze {
                 $self->state_iac(1);
                 $log->debug("IAC\n") if DEBUGTELNETOPTS;
                 next;
-            } elsif ( ord $char >= TELOPT_FIRST ) {
-                warn( "Client ", $self->user, ": shouldn't have received this (!IAC, >240)" );
-                die "&RGarbage character received; Closing connection\r\n";
+            #} elsif ( ord $char >= TELOPT_FIRST ) {
+            #    warn( "Client ", $self->user, ": shouldn't have received this (!IAC, >240)" );
+            #    die "&RGarbage character received; Closing connection\r\n";
             }
             $newdata .= $char;
             next;
