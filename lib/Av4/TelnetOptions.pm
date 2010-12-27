@@ -208,7 +208,7 @@ sub analyze {
                         $log->info( "Client ", $self->user, " OK COMPRESS2 STARTS" ) if DEBUGTELNETOPTS;
                     } elsif ( ord $char == TELOPT_MXP ) {
                         $log->info( "Client ", $self->user, " OK MXP STARTS" ) if DEBUGTELNETOPTS;
-                        $self->user->print( sprintf(
+                        $self->user->print_raw( sprintf(
                             "%c%c%c%c%c", 255, 250, TELOPT_MXP, 255, 240    # IAC SB MXP IAC SE
                         ));
                         $self->user->print( "\e[7z" ); # lock locked mode
@@ -227,7 +227,7 @@ sub analyze {
                     $log->debug(" => IAC WILL!!") if DEBUGTELNETOPTS;
                     if ( ord $char == TELOPT_TTYPE ) {
                         $log->info( "Client ", $self->user, " CAN DO TTYPE" ) if DEBUGTELNETOPTS;
-                        $self->user->print(
+                        $self->user->print_raw(
                             sprintf( "%c%c%c%c%c%c",
                                 TELOPT_IAC, TELOPT_SB, TELOPT_TTYPE, 1, TELOPT_IAC, TELOPT_SE, )
                         );
