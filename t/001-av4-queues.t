@@ -8,6 +8,12 @@ BEGIN {
     use_ok( 'Av4::User' );
 }
 
+{
+    package Av4::PushWrite::Mock;
+    sub new { bless {}, __PACKAGE__ }
+    sub push_write {}
+}
+
 can_ok ('Av4', qw/client_read/);
 can_ok ('Av4::User', qw/dispatch_command/);
 
@@ -23,7 +29,7 @@ my $user;
 eval {
     $user = Av4::User->new(
         server => $srv,
-        id => 123,
+        id => Av4::PushWrite::Mock->new,
     );
     $user->state(1);
 };
