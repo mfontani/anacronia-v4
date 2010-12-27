@@ -68,13 +68,21 @@ sub prompt {
     return $self->print('BUG> ');
 }
 
+sub print_raw
+{
+    my $self = shift;
+    return unless defined $self->id;
+    $self->telopts->send_data(\$_) for @_;
+}
+
 sub print {
     my $self = shift;
     return unless defined $self->id;
-    #$self->id->push_write($_) for @_;
-    $self->telopts->send_data(\$_) for @_;
-    #my $out = join( '', @_ );
-    #$self->telopts->send_data(\$out);
+    for (@_) {
+        my $s = $_;
+        $s =~ s/\xFF/\xFF\xFF/; # IAC IAC => IAC
+        $self->print_raw($s);
+    }
 }
 
 sub broadcast {
@@ -153,7 +161,7 @@ sub state_get_name {
         ansify("&WYou") . ' ' . ansify("&ghave entered the MUD") . ansify("\n\r"),
         1,    # send prompt to others
     );
-    $self->print( $self->prompt );
+    $self->prompt;
     return;
 }
 
@@ -202,7 +210,8 @@ sub dispatch_command {
         $args = '' if ( !defined $args );
         $self->print('');
         if ( !$self->commands->exists($cmd) ) {
-            $self->print( ansify("\n\r&RUnknown command &c'&W$cmd&^&c'\r\n"), $self->prompt, );
+            $self->print( ansify("\n\r&RUnknown command &c'&W$cmd&^&c'\r\n"));
+            $self->prompt;
             #$log->info("Re-weeding: removing command $cmd from list since it's unknown");
             delete $self->queue->[$lineno];
             next;
@@ -259,10 +268,10 @@ sub dispatch_command {
             $Av4::cmd_processed++;
             $self->delay( $self->delay + $delay );
 
-            $self->print( $self->prompt ) if ( $cmd !~ /^\s*quit\s*$/ );
+            $self->prompt if ( $cmd !~ /^\s*quit\s*$/ );
             $log->debug("***DISPATCHED/DELETING $cmd $args");
 
-            $self->prompttimer(AnyEvent->timer( after => $self->delay, cb => sub { $self->print( $self->prompt() ) })) if $self->delay;
+            $self->prompttimer(AnyEvent->timer( after => $self->delay, cb => sub { $self->prompt() })) if $self->delay;
 
             #push @effectively_dispatched, "$cmd $args";
             my $command_dispatched = $self->queue->[$lineno];
