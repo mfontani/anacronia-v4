@@ -1,0 +1,41 @@
+The MUD server probes the client for, and supports, the following Telnet protocol extensions:
+
+COMPRESS2 (also called MCCP2)
+    Upon client connection, the server will send IAC WILL COMPRESS2.
+    If no reply is received, or IAC WONT COMPRESS2 is received, no compression is performed.
+    If the client sends IAC DO COMPRESS2, the server will:
+    - append IAC SB COMPRESS2 IAC SE to signal starting compressing data
+    - enable the "mccp" flag for the client
+    - start sending compressed data until the socket is closed
+    - TODO see what happens on receiving IAC DONT COMPRESS2 from the client
+
+MXP
+    Upon client connection, the server will send IAC WILL MXP.
+    If no reply is received, or IAC WONT MXP is received, MXP is not enabled.
+    If the client sends IAC DO MXP, the server will:
+    - append IAC SB MXP IAC SE to signal starting MXP
+    - append ESC [ 7 z to signal starting of an MXP mode
+    - flag the client as able to accept MXP data
+    - TODO see what happens when changing it during the connection
+
+MSP
+    Upon client connection, the server will send IAC WILL MSP.
+    Currently this doesn't do much.
+
+TTYPE
+    Upon client connection, the server will send IAC DO TTYPE.
+    If the client sends IAC WILL TTYPE, the server will ignore it.
+    If the client sends IAC SB TTYPE <data> IAC SB, the server will interpret the data
+    as being the terminal name of the client.
+
+NAWS
+    Upon client connection, the server will send IAC DO NAWS
+    If the client sends IAC WILL NAWS, the server will ignore it.
+    If the client sends IAC SB NAWS <data> IAC SB, the server will interpret the data
+    as being the width and height of the client.
+
+MCP
+    Upon client connection, the server will advertise its ability to do MCP, sending:
+    #$#mcp version: 2.1 to 2.1\r\n
+    ...
+
