@@ -4,6 +4,9 @@ use warnings;
 use Av4;
 use Av4::Commands;
 use Av4::TelnetOptions;
+use Av4::Telnet qw/
+    TELOPT_IAC TELOPT_GA
+/;
 use Av4::Utils qw/get_logger ansify/;
 use YAML;
 
@@ -50,13 +53,19 @@ sub received_data {
 
 sub prompt {
     my $self = shift;
-    return sprintf("\r\n(%s) (delay %d) > \r\n", $self->name, $self->delay) if $self->state == $STATE_PLAYING;
+    return $self->print_raw(
+        sprintf(
+            "\r\n(%s) (delay %d) > %c%c\r\n",
+            $self->name, $self->delay, TELOPT_IAC, TELOPT_GA,
+        )
+    ) if $self->state == $STATE_PLAYING;
     if ( $state_name{$self->state} eq 'CONNECTED' ) {
-        return sprintf("\r\nHow would you like to be known as? > \r\n");
+        return $self->print_raw(
+            sprintf( "\r\nHow would you like to be known as? > %c%c\r\n", TELOPT_IAC, TELOPT_GA ) );
     }
     my $log = get_logger();
     $log->error("User $self in unknown state " . $self->state());
-    return 'BUG> ';
+    return $self->print('BUG> ');
 }
 
 sub print {
