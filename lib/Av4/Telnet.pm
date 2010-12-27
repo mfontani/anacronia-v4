@@ -12,6 +12,7 @@ our @EXPORT_OK = qw(
   TELOPT_IAC TELOPT_SB TELOPT_SE
   TELOPT_COMPRESS2 TELOPT_MSP TELOPT_MXP
   TELOPT_TTYPE TELOPT_NAWS
+  TELOPT_GA
   _256col
 );
 
@@ -28,6 +29,7 @@ use constant TELOPT_MSP       => 90;
 use constant TELOPT_MXP       => 91;
 use constant TELOPT_SB        => 250;
 use constant TELOPT_SE        => 240;
+use constant TELOPT_GA        => 249;
 
 our %TELOPTS = (
     240 => 'SE',
