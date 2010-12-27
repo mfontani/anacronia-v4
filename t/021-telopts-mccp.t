@@ -108,4 +108,49 @@ is($t->mccp,0,'mccp off after deinitialization string');
 is($t->zstream, 0, 'zstream is 0');
 is($t->user->id->_out_buf,'','_out_buf is empty');
 
+$t = Av4::TelnetOptions->new( user => Av4::User::Mocked->new );
+ok($t,'Av4::TelnetOptions created');
+
+is($t->mccp,0,'default no mccp');
+eq_or_diff(
+    $t->analyze(
+        sprintf("te%c%c%cst",
+            Av4::Telnet::TELOPT_IAC,
+            Av4::Telnet::TELOPT_DO,
+            Av4::Telnet::TELOPT_COMPRESS2,
+        ),
+    ),
+    'test',
+    'mccp initialization between two pieces of text is filtered'
+);
+is($t->mccp,1,'mccp on after initialization string');
+isnt($t->zstream, 0, 'zstream is not 0');
+isnt($t->zstream, '', 'zstream is not empty');
+is(
+    $t->user->id->_out_buf,
+    sprintf("%c%c%c%c%c",
+        Av4::Telnet::TELOPT_IAC,
+        Av4::Telnet::TELOPT_SB,
+        Av4::Telnet::TELOPT_COMPRESS2,
+        Av4::Telnet::TELOPT_IAC,
+        Av4::Telnet::TELOPT_SE,
+    ),
+    'MUD sent IAC SB COMPRESS2 IAC SE'
+);
+
+eq_or_diff(
+    $t->analyze(
+        sprintf("te%c%c%cst",
+            Av4::Telnet::TELOPT_IAC,
+            Av4::Telnet::TELOPT_DONT,
+            Av4::Telnet::TELOPT_COMPRESS2,
+        ),
+    ),
+    'test',
+    'mccp deinitialization between two strings is filtered'
+);
+is($t->mccp,0,'mccp off after deinitialization string');
+is($t->zstream, 0, 'zstream is 0');
+is($t->user->id->_out_buf,'','_out_buf is empty');
+
 done_testing();
