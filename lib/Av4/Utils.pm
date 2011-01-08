@@ -36,7 +36,7 @@ sub get_logger {
 our %ansify_cache;
 sub ansify {
     my ($str,$status) = @_;
-    if (length $str <= 30)
+    if (length $str <= 100)
     {
         if (exists $ansify_cache{$str})
         {
