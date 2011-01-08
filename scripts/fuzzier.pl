@@ -33,8 +33,6 @@ foreach my $clin ( 1 .. $nclients ) {
 
             $_[HEAP]->{server}->put(sprintf("%c%c%c",255,253,86)) if $mccp; # IAC DO COMPRESS2
             #print "Client $clin connected to $host:$port ...\n";
-            $_[HEAP]->{banner_buffer} = [];
-            $_[KERNEL]->delay( send_enter => int rand(3) + 1 );
             $_[HEAP]->{server}->put(random_name() . "\n\n");
         },
         ConnectError => sub {
@@ -44,18 +42,9 @@ foreach my $clin ( 1 .. $nclients ) {
             my ( $kernel, $heap, $input ) = @_[ KERNEL, HEAP, ARG0 ];
 
             #print "Client $clin got input from $host:$port ...\n";
-            push @{ $heap->{banner_buffer} }, $input;
-            $kernel->delay( send_stuff    => undef );
-            $kernel->delay( input_timeout => 1 );
+            $kernel->delay( input_timeout => 0.01 ) if $input =~ /\(delay 0\)/;
         },
         InlineStates => {
-            send_stuff => sub {
-
-                #print "Client $clin sending stuff on $host:$port ...\n";
-                $_[HEAP]->{server}->put("");    # sends enter
-                $_[KERNEL]->delay( input_timeout => 5 );
-                $_[KERNEL]->delay( send_stuff    => int rand(3) + 1 );
-            },
             input_timeout => sub {
                 my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
 
@@ -65,7 +54,6 @@ foreach my $clin ( 1 .. $nclients ) {
                     $kernel->yield("shutdown");
                     return;
                 }
-                $_[KERNEL]->delay( input_timeout => int rand(4) + 1 );
                 $_[HEAP]->{server}->put( rand_command() );
                 $commands++;
 
@@ -80,7 +68,6 @@ my @helps    = qw/map help massign bede cod cry1 cry2 cry3 cry10/;
 
 sub rand_command {
     return (int(rand(2))?"shout power ":"power ") . int(rand(9000)) . "\r\n";
-    my $cmd = ( rand @commands ) + 2;
     my $ret = $commands[ rand @commands ];
     $ret .= ' ';
     $ret .= $helps[ rand @helps ];
