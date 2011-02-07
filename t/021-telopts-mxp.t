@@ -51,6 +51,11 @@ sub readable
 
     package Av4::User::Mocked;
     our $out_buf = '';
+    sub print_raw {
+        shift;
+        $out_buf .= $_ for @_;
+        Test::More::diag("Printed: " . main::readable(@_));
+    }
     sub print {
         shift;
         $out_buf .= $_ for @_;
