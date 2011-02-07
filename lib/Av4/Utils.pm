@@ -5,6 +5,8 @@ use warnings;
 use Cache::Memcached::Fast;
 use Digest::MD5 qw/md5_hex/;
 
+use Log::Log4perl ();
+
 require Av4::Ansi;
 
 require Exporter;

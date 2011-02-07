@@ -1,9 +1,8 @@
 package Av4::User;
 use strict;
 use warnings;
-use Av4;
-use Av4::Commands;
-use Av4::TelnetOptions;
+require Av4::Commands;
+require Av4::TelnetOptions;
 use Av4::Telnet qw/
     TELOPT_IAC TELOPT_GA
 /;

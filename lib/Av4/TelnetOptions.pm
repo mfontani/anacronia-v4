@@ -1,7 +1,6 @@
 package Av4::TelnetOptions;
 use strict;
 use warnings;
-use Av4::User;
 use Compress::Zlib;
 use Av4::Utils qw/get_logger ansify/;
 use Av4::Telnet qw/
