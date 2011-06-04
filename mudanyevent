@@ -9,13 +9,13 @@ use EV;
 use AnyEvent;
 use AnyEvent::Socket;
 use AnyEvent::Handle;
-use Time::HiRes qw/tv_interval gettimeofday/;
+use Time::HiRes qw/tv_interval gettimeofday time/;
 
 use Av4::Telnet qw/%TELOPTS %TELOPTIONS TELOPT_FIRST
-    TELOPT_WILL TELOPT_WONT TELOPT_DO TELOPT_DONT
-    TELOPT_IAC TELOPT_SB TELOPT_SE TELOPT_COMPRESS2
-    TELOPT_TTYPE TELOPT_NAWS TELOPT_MSP TELOPT_MXP
-    _256col/;
+  TELOPT_WILL TELOPT_WONT TELOPT_DO TELOPT_DONT
+  TELOPT_IAC TELOPT_SB TELOPT_SE TELOPT_COMPRESS2
+  TELOPT_TTYPE TELOPT_NAWS TELOPT_MSP TELOPT_MXP
+  _256col/;
 
 my $quit_program = AnyEvent->condvar;
 
@@ -27,7 +27,7 @@ my %stats = (
     sent_bytes => 0,
 );
 
-my $BANNER =<<'END';
+my $BANNER = <<'END';
 In many MUDs commands are parsed and executed in a first-come first-served
 fashion: if the character is currently performing an action which delays
 (casting a spelli for example), any other command (including non-delaying
@@ -41,70 +41,81 @@ queue system in which all the unknown commands are weeded out of the
 command queue, and commands are executed in order of priority. Adding
 specific queue types (attack, defense, movement) is on the roadmap and
 should be fairly easy to implement.
+
 END
 
-tcp_server(undef, 8081, \&accept_cb, sub {
-    my ($fh, $thishost, $thisport) = @_;
-    warn "Listening on $thishost:$thisport\n";
-});
+tcp_server(
+    undef, 8081,
+    \&accept_cb,
+    sub {
+        my ( $fh, $thishost, $thisport ) = @_;
+        warn "Listening on $thishost:$thisport\n";
+        warn "\n\nUSE CTRL+C TO STOP THIS MUD\n\n";
+    }
+);
 
 my $t0 = [gettimeofday];
-my $w = AnyEvent->signal(
+my $w  = AnyEvent->signal(
     signal => "INT",
     cb     => sub {
         $quit_program->send('SIGINT');
     }
 );
 
-my $tick_commands = AnyEvent->timer(
-    after => 1.0,
-    interval => 0.5,
-    cb => sub {
+my $commands_handled = 0;
+my $tick_commands    = AnyEvent->timer(
+    after    => 1.0,
+    interval => 0.05,
+    cb       => sub {
         return unless keys %clients;
         my @deletion;
         my $is_shutdown = 0;
-        for (keys %clients) {
+        for ( keys %clients ) {
             my $handle = $clients{$_}->{handle};
+
             #$handle->push_write("\nTICK!\n");
             #$stats{sent_bytes}+=length("\nTICK!\n");
             next if !@{ $clients{$_}->{lines} };
-            if ( @{ $clients{$_}->{lines} } > 50 )
-            {
+            if ( @{ $clients{$_}->{lines} } > 50 ) {
                 push @deletion, $_;
                 next;
             }
             my $line = shift @{ $clients{$_}->{lines} };
+
             #print "Client $_ got line $line\n";
-            if ($line =~ /\@shutdown/) {
+            if ( $line =~ /\@shutdown/ ) {
                 $is_shutdown = "Client $_";
                 $handle->push_write("Shutting down\n");
                 $stats{sent_bytes} += length "Shutting down\n";
+                $commands_handled++;
                 last;
             }
-            if ($line =~ /\@queues/)
-            {
+            if ( $line =~ /\@queues/ ) {
                 $handle->push_write($BANNER);
                 $stats{sent_bytes} += length $BANNER;
                 $handle->push_write("\n\nQUEUES:\n");
                 $stats{sent_bytes} += length "\n\nQUEUES:\n";
-                for my $c (sort keys %clients)
-                {
-                    my $line = sprintf("%-10s - %d\n", $c, scalar @{$clients{$c}->{lines}});
+                for my $c ( sort keys %clients ) {
+                    my $line = sprintf( "%-10s - %d\n", $c, scalar @{ $clients{$c}->{lines} } );
                     $handle->push_write($line);
                     $stats{sent_bytes} += length $line;
                 }
+                $commands_handled++;
                 next;
             }
             ## print "($curr_client) Got: [", join(' ',map { sprintf("(%c(%d))",$_>=32&&$_<=126?$_:126,$_) } unpack('C*',$_[0]->rbuf)), "]\n";
             $handle->push_write($line);
             $stats{sent_bytes} += length $line;
-            $handle->push_write($BANNER);
-            $stats{sent_bytes} += length $BANNER;
+            $handle->push_write( $BANNER . $BANNER . $BANNER . $BANNER );
+            $stats{sent_bytes} += length( $BANNER . $BANNER . $BANNER . $BANNER );
+            my $prompt = "xxxx (delay 0.0)>\r\n";
+            $handle->push_write($prompt);
+            $stats{sent_bytes} += length $prompt;
+            $commands_handled++;
         }
-        if ( $is_shutdown )
-        {
+        if ($is_shutdown) {
             my $msg = "\n\nMUD SHUTTING DOWN - by $is_shutdown\n\n";
-            for (keys %clients) {
+            for ( keys %clients ) {
                 $clients{$_}->{handle}->push_write($msg);
                 $stats{sent_bytes} += length $msg;
             }
@@ -114,26 +125,32 @@ my $tick_commands = AnyEvent->timer(
             warn "Client $_ spamming\n";
             my $handle = $clients{$_}->{handle};
             delete $clients{$_};
-            $handle->destroy; # destroy handle
+            $handle->destroy;    # destroy handle
         }
     },
 );
 
 my $shutdown_by = $quit_program->recv;
-my $secs = tv_interval($t0,[gettimeofday]);
+my $secs = tv_interval( $t0, [gettimeofday] );
 print "\n\nShut down by $shutdown_by\n";
-print "Received $stats{recv_bytes} bytes - ".sprintf("%05.3f",$stats{recv_bytes}/$secs)." bytes/sec\n";
-print "Sent     $stats{sent_bytes} bytes - ".sprintf("%05.3f",$stats{sent_bytes}/$secs)." bytes/sec\n";
+printf( "Received %-20s bytes - %-15s bytes/sec\n", $stats{recv_bytes}, sprintf( "%05.3f", $stats{recv_bytes} / $secs ) );
+printf(
+    "Sent     %-20s bytes - %-15s bytes/sec - %-10s KiB/sec - %-10s MiB/sec\n",
+    $stats{sent_bytes},
+    sprintf( "%05.3f", $stats{sent_bytes} / $secs ),
+    sprintf( "%05.3f", $stats{sent_bytes} / 1024 / $secs ),
+    sprintf( "%05.3f", $stats{sent_bytes} / 1024 / 1024 / $secs ),
+);
 print "Total run time: $secs seconds\n";
+printf( "Handled %s commands in %s seconds: %.03f commands/second\n", $commands_handled, $secs, $commands_handled / $secs );
 
-sub accept_cb
-{
-    my ($fh, $host, $port) = @_;
+sub accept_cb {
+    my ( $fh, $host, $port ) = @_;
     my $curr_client = $nclients;
     warn "Connection from $host:$port ($curr_client)\n";
     my $handle;
     $handle = new AnyEvent::Handle(
-        fh => $fh,
+        fh       => $fh,
         on_error => sub {
             warn "Error $_[2]";
             $_[0]->destroy();
@@ -141,7 +158,7 @@ sub accept_cb
         on_eof => sub {
             warn "Goodbye client $curr_client\n";
             delete $clients{$curr_client};
-            $handle->destroy; # destroy handle
+            $handle->destroy;    # destroy handle
         },
     );
     $clients{$curr_client}{handle} = $handle;
@@ -153,9 +170,10 @@ sub accept_cb
     $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MSP ) );
     $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MXP ) );
     $handle->push_write( '#$#mcp version: 2.1 to: 2.1' . "\r\n" );
-    $handle->push_write("Hi, Welcome to the MUD!\r\n\r\n"); # FIXME BANNER
+    $handle->push_write("Hi, Welcome to the MUD!\r\n\r\n");    # FIXME BANNER
 
-    $handle->on_read( sub {
+    $handle->on_read(
+        sub {
             $stats{recv_bytes} += length $_[0]->rbuf;
 
             # TODO munge data
@@ -165,7 +183,8 @@ sub accept_cb
 
             # clear input buffer - TODO partials
             $_[0]->rbuf = '';
-        });
+        }
+    );
     $nclients++;
     ();
 }

@@ -1,0 +1,33 @@
+#AREA   Game Basic Rooms~
+#AUTHOR Marco Fontani~
+#RANGES 0 1000$
+#FLAGS 0~
+#ECONOMY 0 1000000~
+
+#ROOMS
+#1
+The void~
+You feel like you are floating in nothing.
+~
+0 0 0
+S
+#2
+The limbo~
+You are in limbo, floating in nothing.
+~
+0 0 0
+D5
+Towards the real world...
+~
+~
+0 0 30 0
+S
+#666
+Hell~
+You really must've pissed off whoever sent you to hell!!
+~
+0 0 0
+S
+#0
+
+#$

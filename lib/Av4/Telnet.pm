@@ -100,7 +100,10 @@ our %TELOPTIONS = (
                                # http://www.zuggsoft.com/zmud/mcp-dev.htm
 );
 
+my $_256col;
+
 sub _256col {
+    return $_256col if defined $_256col;
     my $out = '';
     $out .= "System colors:\r\n";
     for ( my $color = 0 ; $color < 8 ; $color++ ) {
@@ -135,6 +138,7 @@ sub _256col {
     }
     $out .= sprintf "\x1b[0m\r\n";
     $out .= "\r\n\r\n";
+    $_256col = $out;
     return $out;
 }
 

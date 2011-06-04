@@ -1,5 +1,5 @@
 package Av4::Commands::MCP;
-use Av4::Utils qw/get_logger ansify/;
+use Av4::Utils qw/get_logger/;
 require Av4::Commands;
 require Av4;
 require Exporter;
@@ -196,7 +196,7 @@ sub cmd_mcp_blank {
       split( /\s/, $argstr, 2 );    # 'authentication-key:', '480676 version: 2.1 to: 2.1'
     if ( !defined $subcommands[0] ) {
         $log->info('IGNORING MCP command with no params');
-        return 0;
+        return [0];
     }
     $subcommands[1] = '' if ( !defined $subcommands[1] );
 
@@ -204,10 +204,11 @@ sub cmd_mcp_blank {
     if ( $subcommands[0] eq 'authentication-key:' ) {
         $log->info('MCP => cmd_mcp_authentication_key');
         return cmd_mcp_authentication_key( $client, $user, $subcommands[1] );
-    } else {
+    }
+    else {
         $log->info( 'UNKNOWN MCP COMMAND: >', $subcommands[0], '< => UNHANDLED!' );
     }
-    return 0;
+    return [0];
 }
 
 # for command: #$#mcp authentication-key: AUTHKEY *
@@ -221,13 +222,14 @@ sub cmd_mcp_authentication_key {
     my ( $authkey, $options ) = split( /\s/, $argstr, 2 );    # '480676', 'version: 2.1 to: 2.1'
     if ( !defined $authkey ) {
         $log->info('IGNORING MCP AUTH command with no authkey');
-        return 0;
+        return [0];
     }
     $user->mcp_authentication_key($authkey);
     $log->info( 'MCP AUTH for user ', $user, ': ', $authkey );
 
     # Advertises the server's support for mcp-cord and whatever else is supported
-    $user->print(
+    my $output = join(
+        '',
         "\r\n",
         '#$#mcp-negotiate-can ', $authkey,
         ' package: mcp-negotiate min-version: 1.0 max-version: 2.0',
@@ -246,7 +248,7 @@ sub cmd_mcp_authentication_key {
 
         # that's it
     );
-    return 0;
+    return [ 0, $output ];
 }
 
 # for command: #$#mcp-negotiate-end AUTHKEY
@@ -261,9 +263,9 @@ sub cmd_mcp_negotiate_end {
     $authkey = '' if ( !defined $authkey );
     if ( $user->mcp_authentication_key ne $authkey ) {
         $log->info("MCP NEGOTIATE-END sent with wrong auth string, IGNORING");
-        return 0;
+        return [0];
     }
-    return 0;
+    return [0];
 }
 
 # for command: #$#mcp-negotiate-can AUTHKEY package: PKGNAME min-version: MVER max-version: MXVER
@@ -278,7 +280,7 @@ sub cmd_mcp_negotiate_can {
     $authkey = '' if ( !defined $authkey );
     if ( $user->mcp_authentication_key ne $authkey ) {
         $log->info("MCP NEGOTIATE-CAN sent with wrong auth string, IGNORING");
-        return 0;
+        return [0];
     }
 
     # $argstr = package: PKGNAME min-version: MVER max-version: MXVER
@@ -287,7 +289,7 @@ sub cmd_mcp_negotiate_can {
     my @tokens = split( /\s/, $argstr );
     if ( scalar @tokens % 2 == 1 ) {
         $log->info("MCP NEGOTIATE-CAN sent an odd number of tokens, IGNORING");
-        return 0;
+        return [0];
     }
 
     # interested in the following:
@@ -302,61 +304,58 @@ sub cmd_mcp_negotiate_can {
         if ( $tokens[$i] eq 'package:' ) {
             if ( !defined $tokens[ $i + 1 ] ) {
                 $log->info("MCP NEGOTIATE-CAN sent 'package:' without name after, IGNORING");
-                return 0;
+                return [0];
             }
             $verbatim_package_found = 1;
             $package_name           = $tokens[ $i + 1 ];
-        } elsif ( $tokens[$i] eq 'min-version:' ) {
+        }
+        elsif ( $tokens[$i] eq 'min-version:' ) {
             if ( !defined $tokens[ $i + 1 ] ) {
                 $log->info("MCP NEGOTIATE-CAN sent 'min-version:' without it after, IGNORING");
-                return 0;
+                return [0];
             }
             $verbatim_min_version_found = 1;
             $min_version                = $tokens[ $i + 1 ];
-        } elsif ( $tokens[$i] eq 'max-version:' ) {
+        }
+        elsif ( $tokens[$i] eq 'max-version:' ) {
             if ( !defined $tokens[ $i + 1 ] ) {
                 $log->info("MCP NEGOTIATE-CAN sent 'max-version:' without it after, IGNORING");
-                return 0;
+                return [0];
             }
             $verbatim_max_version_found = 1;
             $max_version                = $tokens[ $i + 1 ];
-        } else {
+        }
+        else {
             $log->info( "MCP NEGOTIATE-CAN IGNORING because of unknown token: ", $tokens[$i] );
-            return 0;
+            return [0];
         }
     }
 
     # bail out if the syntax isn't recognised
     if ( !$verbatim_package_found ) {
         $log->info("MCP NEGOTIATE-CAN hasn't sent 'package:', IGNORING");
-        return 0;
+        return [0];
     }
     if ( !$verbatim_min_version_found ) {
         $log->info("MCP NEGOTIATE-CAN hasn't sent 'min-version:', IGNORING");
-        return 0;
+        return [0];
     }
     if ( !$verbatim_max_version_found ) {
         $log->info("MCP NEGOTIATE-CAN hasn't sent 'max-version:', IGNORING");
-        return 0;
+        return [0];
     }
 
     # all seems good
-    $log->info(
-        "MCP: looks like ",
-        $package_name, " is supported, ",
-        "versions ", $min_version, " to ", $max_version
-    );
+    $log->info( "MCP: looks like ", $package_name, " is supported, ", "versions ", $min_version, " to ", $max_version );
 
     # debug?
-    $user->print(
-        ansify("&CMCP &rACK'ing"),
-        " your support of MCP package ",
-        ansify("&W$package_name"),
-        " versions ", ansify("&r$min_version"),
-        '-', ansify("&r$max_version"), "\r\n",
-    ) if (0);
+    #$user->print(
+    #    "$Av4::Utils::ANSI{'&C'}MCP $Av4::Utils::ANSI{'&g'}ACK$Av4::Utils::ANSI{'&w'}'ing " .
+    #    "your support of MCP package $Av4::Utils::ANSI{'&W'}$package_name versions " .
+    #    "$Av4::Utils::ANSI{'&r'}$min_version$Av4::Utils::ANSI{'&w'}-$Av4::Utils::ANSI{'&r'}$max_version\r\n"
+    #) if (0);
     $user->mcp_packages_supported->{$package_name} = [ $min_version, $max_version ];
-    return 0;
+    return [0];
 }
 
 # for command: #$#dns-com-awns-ping <authkey> id: <unique id>
@@ -371,7 +370,7 @@ sub cmd_mcp_dns_com_awns_ping {
     $authkey = '' if ( !defined $authkey );
     if ( $user->mcp_authentication_key ne $authkey ) {
         $log->info("MCP DNS-COM-AWNS-PING sent with wrong auth string, IGNORING");
-        return 0;
+        return [0];
     }
 
     # $argstr = package: PKGNAME min-version: MVER max-version: MXVER
@@ -380,7 +379,7 @@ sub cmd_mcp_dns_com_awns_ping {
     my @tokens = split( /\s/, $argstr );
     if ( scalar @tokens % 2 == 1 ) {
         $log->info("MCP DNS-COM-AWNS-PING sent an odd number of tokens, IGNORING");
-        return 0;
+        return [0];
     }
 
     # interested in the following:
@@ -391,31 +390,27 @@ sub cmd_mcp_dns_com_awns_ping {
         if ( $tokens[$i] eq 'id:' ) {
             if ( !defined $tokens[ $i + 1 ] ) {
                 $log->info("MCP DNS-COM-AWNS-PING sent 'id:' without name after, IGNORING");
-                return 0;
+                return [0];
             }
             $verbatim_id_found = 1;
             $ping_id           = $tokens[ $i + 1 ];
-        } else {
+        }
+        else {
             $log->info( "MCP DNS-COM-AWNS-PING IGNORING because of unknown token: ", $tokens[$i] );
-            return 0;
+            return [0];
         }
     }
 
     # bail out if the syntax isn't recognised
     if ( !$verbatim_id_found ) {
         $log->info("MCP DNS-COM-AWNS-PING hasn't sent 'id:', IGNORING");
-        return 0;
+        return [0];
     }
 
     # answer the ping
-    $user->print(
-        '#$#dns-com-awns-ping-reply ',
-        $user->mcp_authentication_key,
-        ' id: ', $ping_id, "\r\n", '#$#dns-com-awns-ping-reply ',
-        'id: ', $ping_id, "\r\n",
-    );
     $log->info( 'MCP DNS-COM-AWNS-PING: replied to ping id ', $ping_id );
-    return 0;
+    return [ 0,
+        '#$#dns-com-awns-ping-reply ' . $user->mcp_authentication_key . " id: $ping_id\r\n" . '#$#dns-com-awns-ping-reply ' . "id: $ping_id\r\n" ];
 }
 
 sub cmd_at_editname {
@@ -423,8 +418,7 @@ sub cmd_at_editname {
     my $log = get_logger();
 
     if ( !$user->mcp_authentication_key ) {
-        $user->print( ansify("&rCommand available only to MCP users\r\n") );
-        return 0;
+        return [ 0, "$Av4::Utils::ANSI{'&r'}Command available only to MCP users\r\n" ];
     }
 
 =for example
@@ -457,18 +451,16 @@ sub cmd_at_editname {
     #    '#$#* ', $datatag, ' content: ', $user->name ? $user->name : 'yourname', "\n",
     #    '#$#: ', $datatag, "\n",
     #);
-    $user->print(
-        '#$#dns-org-mud-moo-simpleedit-content ',
-        $user->mcp_authentication_key,
-' reference: "str:#2.description" name: Wizard.description type: string content*: "" _data-tag: 11662825430',
-        "\x0D\x0A",
-        '#$#* 11662825430 content: You see a wizard who chooses not to reveal eir true appearance.',
-        "\x0D\x0A",
-        '#$#: 11662825430',
-        "\x0D\x0A",
-        "\x0D\x0A",
-    );
-    return 0;
+    return [ 0,
+            '#$#dns-org-mud-moo-simpleedit-content '
+          . $user->mcp_authentication_key
+          . ' reference: "str:#2.description" name: Wizard.description type: string content*: "" _data-tag: 11662825430'
+          . "\x0D\x0A"
+          . '#$#* 11662825430 content: You see a wizard who chooses not to reveal eir true appearance.'
+          . "\x0D\x0A"
+          . '#$#: 11662825430'
+          . "\x0D\x0A"
+          . "\x0D\x0A" ];
 }
 
 1;

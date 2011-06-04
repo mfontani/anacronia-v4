@@ -7,28 +7,40 @@ use Digest::MD5 qw/md5_hex/;
 
 use Log::Log4perl ();
 
-require Av4::Ansi;
+use Av4::Ansi;
 
 require Exporter;
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(get_logger ansify);
+
+our %ANSI;
+
+BEGIN {
+    for (qw<x r g y b p c w>) {
+        $ANSI{"&$_"} = Av4::Ansi::ansify("&$_");
+        $ANSI{"^$_"} = Av4::Ansi::ansify("^$_");
+        my $u = uc $_;
+        $ANSI{"&$u"} = Av4::Ansi::ansify("&$u");
+        $ANSI{"^$u"} = Av4::Ansi::ansify("^$u");
+    }
+    $ANSI{'&^'} = Av4::Ansi::ansify('&^');
+    $ANSI{'^&'} = Av4::Ansi::ansify('^&');
+}
 
 our $memcached_hits   = 0;
 our $memcached_misses = 0;
 our $memoized_hits    = 0;
 our $memoized_misses  = 0;
 
-our $memd = new Cache::Memcached::Fast({
-    servers => [
-        {
-            address => '127.0.0.1:11211',
-        }
-    ],
-    namespace => 'av4:',
-    connect_timeout => 0.2,
-    io_timeout => 0.2,
-    compress_ratio => 0.9,
-});
+our $memd = new Cache::Memcached::Fast(
+    {
+        servers         => [ { address => '127.0.0.1:11211', } ],
+        namespace       => 'av4:',
+        connect_timeout => 0.2,
+        io_timeout      => 0.2,
+        compress_ratio  => 0.9,
+    }
+);
 
 sub get_logger {
     my ($subroutine) = ( caller(1) )[3];
@@ -36,26 +48,25 @@ sub get_logger {
 }
 
 our %ansify_cache;
+
 sub ansify {
-    my ($str,$status) = @_;
-    if (length $str <= 100)
-    {
-        if (exists $ansify_cache{$str})
-        {
+    my ( $str, $status ) = @_;
+    if ( length $str <= 4096 ) {
+        if ( exists $ansify_cache{$str} ) {
             $memoized_hits++;
             return $ansify_cache{$str};
         }
         $memoized_misses++;
-        $ansify_cache{$str} = Av4::Ansi::ansify($str,$status);
+        $ansify_cache{$str} = Av4::Ansi::ansify( $str, $status );
         return $ansify_cache{$str};
     }
     my $md5 = md5_hex($str);
     my $hit = $memd->get($md5);
-    if ( $hit ) { $memcached_hits++ ; return $hit; }
+    if ($hit) { $memcached_hits++; return $hit; }
     $memcached_misses++;
     warn "Memcached MISS on $str";
-    my $ansified = Av4::Ansi::ansify($str,$status);
-    $memd->set($md5,$ansified);
+    my $ansified = Av4::Ansi::ansify( $str, $status );
+    $memd->set( $md5, $ansified );
     return $ansified;
 }
 

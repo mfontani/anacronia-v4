@@ -22,9 +22,9 @@ sub areaparse {
     while (<$F>) {
         my $line = $_;
         $lineno++;
-        next if ( $line =~ /^\s*$/ );
+        next if ( $line =~ /^\s*$/ && ( !$section || !$subsection ) );
         if ( !$section ) {    # looking for #SECTIONNAME
-            die "Line $lineno: havent found any section name!\n"
+            die "Line $lineno: havent found any section name!\nLine: '$line'\n"
               if ( $line !~ /^\#\w+\s*$/ );
             $section = $line;
             $section =~ s/^\#//g;
@@ -33,7 +33,7 @@ sub areaparse {
             next;
         }
         if ( !$subsection ) {    # on help file, level + keywords
-            die "Line $lineno: doesnt match number + letters + ~\n"
+            die "Line $lineno: doesnt match number + letters + ~\nLine: '$line'\n"
               unless ( my ( $level, $keywords ) = $line =~ /^\s*\-?(\d*)\s*(.*)\~\s*$/ );
             $log->debug("Line $lineno: Level $level keywords $keywords");
             $subsection   = $keywords;
@@ -46,9 +46,10 @@ sub areaparse {
             push(
                 @area,
                 Av4::Help->new(
-                    level    => $sectionlevel,
-                    keywords => $subsection,
-                    data     => $data
+                    level         => $sectionlevel,
+                    keywords      => $subsection,
+                    data          => $data,
+                    data_ansified => Av4::Ansi::ansify($data),
                 )
             );
             $subsection = 0;
@@ -56,8 +57,9 @@ sub areaparse {
             $log->debug("Line $lineno: Got help page for $subsection");
             next;
         }
-        chomp($line);
-        $data .= $line . "\r\n";
+
+        #chomp($line);
+        $data .= $line;    # . "\r\n";
     }
     close $F;
     $areahelps = \@area;
@@ -67,10 +69,12 @@ sub areaparse {
 sub areahelp {
     my ( $helps, $which ) = @_;
     $which =~ s/[\x0d\x0a]//g;
+
     #$log->debug("areahelp: Searching for `$which`");
     foreach (@$helps) {
         return $_ if ( $_->keywords =~ /\b\Q$which\E/i );
     }
+
     #$log->debug("areahelp: No helps found for `$which`");
     return undef;
 }

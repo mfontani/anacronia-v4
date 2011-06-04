@@ -1,22 +1,28 @@
 package Av4;
+use 5.010_001;    # at least
 use strict;
 use warnings;
 
-use EV;
 use AnyEvent;
 use AnyEvent::Socket;
 use AnyEvent::Handle;
 use AnyEvent::Gearman::Client;
-use Time::HiRes qw/tv_interval gettimeofday/;
+use Time::HiRes qw/tv_interval gettimeofday time/;
 
 use Log::Log4perl;
 use YAML;
 
-use Av4::Utils qw/get_logger ansify/;
-
+use Av4::Help;
+use Av4::Entity;
+use Av4::Entity::Player;
+use Av4::Entity::Mobile;
+require Av4::Utils;
 require Av4::Server;
+require Av4::Command;            # access to %time_taken_by_command
+require Av4::Commands::Basic;    # to invalidate the who list
 
 use Av4::HelpParse;
+use Av4::AreaParse;
 use Av4::Telnet qw/
   %TELOPTS %TELOPTIONS
   TELOPT_FIRST
@@ -28,40 +34,84 @@ use Av4::Telnet qw/
   _256col
   /;
 
-# general settings
-our $listen_port = 8081;
+# When using Devel::NYTProf, it seems that AnyEvent's way of trying to use
+# Time::HiRes's 'time' for its own 'time' and 'now' doesn't quite work, and it
+# ends up creating a ton of evals whenever AnyEvent's time() or now() is called.
+# This in turn creates slowness and slugginesh of the whole thing, _and_ makes
+# running nytprofhtml the sort of thing you go on holidays whilst it does its
+# thing. With the below block, I don't need to go make a coffee while nytprof
+# runs.
+{
 
-# general stats
+    package AE;
+    no warnings 'redefine';
+    sub time () { goto &Time::HiRes::time }
+    sub now ()  { goto &Time::HiRes::time }
+
+    package AnyEvent;
+    sub time () { goto &Time::HiRes::time }
+    sub now ()  { goto &Time::HiRes::time }
+}
+
+# general settings -- these *may* be used somewhere else, hence they're 'our' vars
+our $listen_address = undef;
+our $listen_port    = 8081;
+
+# These are used and set by Av4::TelnetOptions, by cmd_stats in Av4::Commands::Basic
+# and shown when the mud terminates; hence they're 'our' vars.
 our $mud_chars_sent         = 0;    # characters sent by mud
 our $mud_chars_sent_nonmccp = 0;    # how many of these weren't compressed
 our $mud_chars_sent_mccp    = 0;    # how many of these were compressed
 our $mud_data_sent          = 0;    # data effectively sent
 our $mud_data_sent_nonmccp  = 0;    # data sent uncompressed
 our $mud_data_sent_mccp     = 0;    # data sent compressed
+our $mud_start              = 0;    # time_t the mud started
+our $cmd_processed          = 0;    # for stats: how many commands (even unknown) were processed
 
-# time and other stats
-our $mud_start              = 0;
-our $cmd_processed          = 0;
+# These (overridable with ->new() args) indicate how often the 'ticks' are executed:
+# Values are expressed in seconds.
+# - the "flush" tick flushes all buffers associated with connected sockets
+# - the "commands" tick iterates through all entities' queues and executes commands
+# - the "players" tick saves info about how many players are online at that time
+# - the "mobiles" tick may or may not have mobs execute actions (AI)
+# - the "area" tick is supposed to reset (parts of) an area, and is not currently implemented.
+our $sec_tick_flush    = 0.075;     # Buffers are flushed at each of this ticks
+our $sec_tick_commands = 0.15;      # Commands are executed with delay is 0, delay is decremented every $sec_tick_commands seconds
+our $sec_tick_mobiles  = 3.85;      # Mobiles execute actions (or not) every $sec_tick_mobiles seconds
+our $sec_tick_players  = 0.50;      # Saves info about how many players are online at that date/time
+our $sec_tick_area     = 59.35;     # Area-specific resets etc. happen every $sec_tick_area seconds
 
-# defaults for ticks
-our $tick_commands = 1.0;
+# For statistics purposes, these record the time_t a tick happened, and how long it took.
+# Each of these arrays' members is a [ time, tv_interval ] of a tick which occurred.
+our @delta_tick_commands;
+our @delta_tick_flush;
+our @delta_tick_players;
 
-our $shutdown_connected = 0;
+# The welcome banner (from a specific help page) is calculated and ansified once at
+# startup, and then kept in this variable. There is no need to have it ansified at
+# every single connection.
+our $mud_welcome_banner = "Hello\r\n";
 
+# The mud server -- in a way, a singleton although not really one..
 our $server = undef;
 
-our $gearman = AnyEvent::Gearman::Client->new(job_servers => ['127.0.0.1'],);
+# Used by "delegated" commands (so far, only a test)
+our $gearman = AnyEvent::Gearman::Client->new( job_servers => ['127.0.0.1'], );
 
+# This condvar is used to terminate the MUD. When anything sends it anything,
+# the MUD terminates and will display statistics about its execution.
 our $quit_program = AnyEvent->condvar;
 
+# Creates a new object, mainly setting undefined variables to their correct
+# defaults and configuring log4perl if the "fake" option is given.
 sub new {
     my $class = shift;
     my $opts  = {@_};
     $opts->{fake} = 0 if ( !defined $opts->{fake} );
-    $opts->{helpfile} = 'help.are' if ( !defined $opts->{helpfile} );
     if ( !$opts->{fake} ) {
         Log::Log4perl::init_and_watch( 'log.conf', 'HUP' );
-    } else {
+    }
+    else {
         my $conf = q{
             log4perl.category.Av4 = DEBUG, Screen
             log4perl.category.main.new_dispatch_command = TRACE, Screen
@@ -73,102 +123,283 @@ sub new {
         };
         Log::Log4perl::init( \$conf );
     }
+    $opts->{helpfile} = 'help.are' if ( !defined $opts->{helpfile} );
+    $opts->{areadir}  = 'areas'    if ( !defined $opts->{areadir} );
     my $self = {};
-    $listen_port   = $opts->{listen_port}   if ( defined $opts->{listen_port} );
-    $tick_commands = $opts->{tick_commands} if ( defined $opts->{tick_commands} );
-    $self->{helpfile} = $opts->{helpfile};
+    $listen_address    = $opts->{listen_address} if ( defined $opts->{listen_address} );
+    $listen_port       = $opts->{listen_port}    if ( defined $opts->{listen_port} );
+    $sec_tick_flush    = $opts->{tick_flush}     if ( defined $opts->{tick_flush} );
+    $sec_tick_commands = $opts->{tick_commands}  if ( defined $opts->{tick_commands} );
+    $sec_tick_mobiles  = $opts->{tick_mobiles}   if ( defined $opts->{tick_mobiles} );
+    $self->{helpfile}  = $opts->{helpfile};
+    $self->{areadir}   = $opts->{areadir};
     return bless $self, $class;
 }
 
+# Actually runs the MUD. This needs called if you actually want to run the
+# thing. It also performs the startup stuff (loading helps, areas etc) and
+# displays execution statistics at the end. Stuff like this should probably
+# be moved to Av4::Server.
 sub run {
-    my $self    = shift;
+    my $self = shift;
     $server = Av4::Server->new(
-        helps  => Av4::HelpParse::areaparse($self->{helpfile}),
+        helps => Av4::HelpParse::areaparse( $self->{helpfile} ),
+        areas => Av4::AreaParse::areaparse( $self->{areadir} ),
     );
-    tcp_server(undef, $listen_port, \&server_accept_cb, sub {
-        my ($fh, $thishost, $thisport) = @_;
-        warn("TCP ready on port $thisport\n");
-    });
+    warn "Parsed helps from file '$self->{helpfile}' -- helps parsed: " . scalar @{ $server->helps } . "\n";
+    warn "Parsed areas from dir  '$self->{areadir}' -- areas parsed: " . scalar @{ $server->areas } . "\n";
+    my $banner = eval { Av4::HelpParse::areahelp( $server->helps, '__WELCOME__SCREEN__' )->data };
+    $banner = "Hi, Welcome to the MUD!\r\n" if !defined $banner;
+    $banner .= "\r\n";
+    $mud_welcome_banner =
+        sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_COMPRESS2 )
+      . sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_TTYPE )
+      . sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_NAWS )
+      . sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MSP )
+      . sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MXP )
+      . '#$#mcp version: 2.1 to: 2.1' . "\r\n"
+      . $banner;
     my $w = AnyEvent->signal(
         signal => "INT",
         cb     => sub {
             $quit_program->send('SIGINT');
         }
     );
+
+    my $tick_buffers_flush = AnyEvent->timer(
+        after    => 1.0,
+        interval => $sec_tick_flush,
+        cb       => \&tick_flush,
+    );
+    warn "Tick flush called every $sec_tick_flush\n";
+
+    my $tick_players = AnyEvent->timer(
+        after    => 1.0,
+        interval => $sec_tick_players,
+        cb       => \&tick_players,
+    );
+    warn "Tick players called every $sec_tick_players\n";
+
     my $tick_commands = AnyEvent->timer(
-        after => 1.0,
-        interval => 0.5,
-        cb => \&tick_commands,
+        after    => 1.0,
+        interval => $sec_tick_commands,
+        cb       => \&tick_commands,
+    );
+    warn "Tick commands removes $sec_tick_commands each run\n";
+
+    my $tick_mobiles = AnyEvent->timer(
+        after    => 1.0,
+        interval => $sec_tick_mobiles,
+        cb       => \&tick_mobiles,
     );
     $mud_start = [gettimeofday];
+
+    # Load mobs from areas' resets
+    {
+        for my $area ( @{ $server->areas } ) {
+            for my $mob ( @{ $area->mobiles // [] } ) {
+                if ( $mob->in_room ) {
+                    $mob->server($server);
+                    $mob->commands_dispatched( [] );
+                    $mob->queue(               [] );
+                    $mob->delay(0);
+                    my $room = $Av4::Room::rooms{ $mob->in_room };
+                    if ($room) {
+                        $mob->move_to_room( $mob->in_room );
+                    }
+                    else {
+                        warn "Mob vnum " . $mob->{vnum} . " has unknown in_room: " . $mob->in_room . "\n";
+                    }
+                }
+                else {
+                    warn "Mob vnum " . $mob->{vnum} . " has no in_room\n";
+                }
+            }
+        }
+    }
+
+    # TEST - create some entities
+    if (0) {
+        my $start_room = $Av4::Room::rooms{37};
+        for ( 1 .. 10 ) {
+            my $ent = Av4::Entity::Mobile->new(
+                Av4::Entity::Mobile->defaults,
+                server              => $server,
+                name                => 'Entity#' . $_,
+                in_room             => 30 + int( rand(4) ),
+                commands_dispatched => [],
+                queue               => [],
+            );
+            push @{ $start_room->entities() }, $ent;
+            push @{ $server->entities() },     $ent;
+        }
+    }
+
+    warn sprintf( "Listening on %s port %s\n", ( $listen_address // '*' ), $listen_port );
+    if ( exists $INC{'Devel/NYTProf.pm'} ) {
+        warn '-' x 72, "\nProfiling enabled...\n", '-' x 72, "\n";
+        DB::enable_profile();
+    }
+
+    tcp_server(
+        $listen_address,
+        $listen_port,
+        \&server_accept_cb,
+        sub {
+            my ( $fh, $thishost, $thisport ) = @_;
+            warn( "\e[32mTCP ready on address " . ( $listen_address // '*' ) . " port $thisport\e[0m\n" );
+        }
+    );
+
+    # Everything "stops" here and AnyEvent does its thing, until something or
+    # somebody does a $quit_program->send, at which point the rest of the program
+    # here resumes, mainly displaying statistics about its execution.
     my $shutdown_by = $quit_program->recv;
-    my $mud_uptime = tv_interval($mud_start,[gettimeofday]);
+
+    if ( exists $INC{'Devel/NYTProf.pm'} ) {
+        DB::disable_profile();
+        warn '-' x 72, "\nProfiling disabled...\n", '-' x 72, "\n";
+    }
+
+    # Statistics are now displayed:
+    my $mud_uptime = tv_interval( $mud_start, [gettimeofday] );
     warn "\n\nShut down by $shutdown_by\n";
-    warn sprintf( "Clients connected: $shutdown_connected\n" );
     warn sprintf( "MUD chars sent:         %20lu (%20.2f b/s)\n",   $mud_chars_sent,         $mud_chars_sent / $mud_uptime );
     warn sprintf( "MUD chars sent !mccp:   %20lu (%20.2f b/s)\n",   $mud_chars_sent_nonmccp, $mud_chars_sent_nonmccp / $mud_uptime );
     warn sprintf( "MUD chars sent mccp:    %20lu (%20.2f b/s)\n",   $mud_chars_sent_mccp,    $mud_chars_sent_mccp / $mud_uptime );
     warn sprintf( "MUD data sent:          %20lu (%20.2f KiB/s)\n", $mud_data_sent,          $mud_data_sent / 1024 / $mud_uptime );
     warn sprintf( "MUD data sent !mccp:    %20lu (%20.2f KiB/s)\n", $mud_data_sent_nonmccp,  $mud_data_sent_nonmccp / 1024 / $mud_uptime );
-    warn sprintf( "MUD data sent mccp:     %20lu (%20.2f KiB/s)\n", $mud_data_sent_mccp,     $mud_data_sent_mccp /1024 / $mud_uptime );
-    warn sprintf( "Processed %d commands   in %d seconds: %2.2f commands/second\n",$cmd_processed,$mud_uptime,($cmd_processed/$mud_uptime));
-    warn sprintf( "Memcached hits:         %d\n", $Av4::Utils::memcached_hits);
-    warn sprintf( "Memcached misses:       %d\n", $Av4::Utils::memcached_misses);
-    warn sprintf( "Memoized hits:          %d\n", $Av4::Utils::memoized_hits);
-    warn sprintf( "Memoized misses:        %d\n", $Av4::Utils::memoized_misses);
+    warn sprintf( "MUD data sent mccp:     %20lu (%20.2f KiB/s)\n", $mud_data_sent_mccp,     $mud_data_sent_mccp / 1024 / $mud_uptime );
+    warn sprintf( "Processed %d commands   in %d seconds: %2.2f commands/second\n", $cmd_processed, $mud_uptime, ( $cmd_processed / $mud_uptime ) );
+    warn sprintf( "Memcached hits:         %d\n", $Av4::Utils::memcached_hits )   if $Av4::Utils::memcached_hits or $Av4::Utils::memcached_misses;
+    warn sprintf( "Memcached misses:       %d\n", $Av4::Utils::memcached_misses ) if $Av4::Utils::memcached_hits or $Av4::Utils::memcached_misses;
+    warn sprintf( "Memoized hits:          %d\n", $Av4::Utils::memoized_hits )    if $Av4::Utils::memoized_hits  or $Av4::Utils::memoized_misses;
+    warn sprintf( "Memoized misses:        %d\n", $Av4::Utils::memoized_misses )  if $Av4::Utils::memoized_hits  or $Av4::Utils::memoized_misses;
     eval "use Devel::Size;";
-    warn sprintf( "Memoized D::Size bytes: %d\n", Devel::Size::total_size(\%Av4::Utils::ansify_cache)) if (!$@);
-    warn "Stopped now\n";
+    warn sprintf( "Memoized D::Size bytes: %d\n", Devel::Size::total_size( \%Av4::Utils::ansify_cache ) ) if ( !$@ );
+    {
+        open my $fh, '>', 'tick_players.csv';
+        print $fh "tick,players\n";
+        for ( 0 .. $#delta_tick_players ) {
+            print $fh sprintf( "%s,%d\n", @{ $delta_tick_players[$_] } );
+        }
+        close $fh;
+    }
+    warn "Tick commands: " . scalar @delta_tick_commands, "\n";
+    my $total = 0;
+    map { $total += $_->[1] } @delta_tick_commands;
+    my $min = $delta_tick_commands[0]->[1];
+    my $max = $delta_tick_commands[0]->[1];
+    {
+        open my $fh, '>', 'tick_commands.csv';
+        print $fh "tick,seconds\n";
+        for ( 0 .. $#delta_tick_commands ) {
+            print $fh sprintf( "%s,%.6f\n", @{ $delta_tick_commands[$_] } );
+        }
+        close $fh;
+    }
+    map { $min = $_->[1] if $_->[1] < $min; $max = $_->[1] if $_->[1] > $max; } @delta_tick_commands;
+
+    # Time taken by command, from Av4::Command
+    {
+        warn "Time taken by command:\n";
+        for my $command ( sort keys %Av4::Command::time_taken_by_command ) {
+            my $min        = $Av4::Command::time_taken_by_command{$command}->[0]->[1];
+            my $max        = $Av4::Command::time_taken_by_command{$command}->[0]->[1];
+            my $total      = 0;
+            my $min_size   = 0;
+            my $max_size   = 0;
+            my $total_size = 0;
+            my $n_commands = 0;
+            for ( @{ $Av4::Command::time_taken_by_command{$command} } ) {
+                $n_commands++;
+                $min = $_->[1] if $_->[1] < $min;
+                $max = $_->[1] if $_->[1] > $max;
+                $total += $_->[1];
+                if ( $_->[2] ) {
+                    $min_size = $_->[2] if !$min_size;
+                    $min_size = $_->[2] if $_->[2] < $min_size;
+                    $max_size = $_->[2] if $_->[2] > $max_size;
+                    $total_size += $_->[2];
+                }
+            }
+            warn sprintf(
+                "  Command %-10s took min %.6f max %.6f median %.6f min size %s max size %s median size %s\n",
+                $command, $min, $max, $total / $n_commands,
+                $min_size, $max_size, $total_size / $n_commands
+            );
+        }
+    }
+
+    warn sprintf( "Tick commands median: %.6f\n", ( $total / scalar @delta_tick_commands ) );
+    warn sprintf( "Tick commands min:    %.6f\n", $min );
+    warn sprintf( "Tick commands max:    %.6f [vs max $sec_tick_commands] %s\n", $max, $max > $sec_tick_commands ? ' [WARNING]' : '[OK]' );
+    warn "Tick flush: " . scalar @delta_tick_flush, "\n";
+    $total = 0;
+    map { $total += $_->[1] } @delta_tick_flush;
+    $min = $delta_tick_flush[0]->[1];
+    $max = $delta_tick_flush[0]->[1];
+    {
+        open my $fh, '>', 'tick_flush.csv';
+        print $fh "tick,seconds\n";
+        for ( 0 .. $#delta_tick_flush ) {
+            print $fh sprintf( "%s,%.6f\n", @{ $delta_tick_flush[$_] } );
+        }
+        close $fh;
+    }
+    map { $min = $_->[1] if $_->[1] < $min; $max = $_->[1] if $_->[1] > $max; } @delta_tick_flush;
+    warn sprintf( "Tick flush median: %.6f\n", ( $total / scalar @delta_tick_flush ) );
+    warn sprintf( "Tick flush min:    %.6f\n", $min );
+    warn sprintf( "Tick flush max:    %.6f [vs max $sec_tick_flush] %s\n", $max, $max > $sec_tick_flush ? ' [WARNING]' : '[OK]' );
+
+    # Have a nice day!
     exit 0;
 }
 
+# This gets called whenever a new client connects to the server.
+# A new AnyEvent::Handle is created for the connection, as well as
+# a Av4::Entity::Player which is added to the global list of MUD
+# entities connected. The MUD banner is sent, and the player's
+# callback on input is set so they will actually able to do something.
 sub server_accept_cb {
-    my ($fh, $host, $port) = @_;
+    my ( $fh, $host, $port ) = @_;
     my $handle;
     $handle = new AnyEvent::Handle(
-        fh => $fh,
+
+        #autocork => 1,
+        fh       => $fh,
         on_error => \&client_error,
-        #sub {
-        #    warn "Error $_[2]";
-        #   $_[0]->destroy();
-        #},
-        on_eof => \&client_quit,
-        #sub {
-        #    warn "Goodbye client $curr_client\n";
-        #    delete $clients{$curr_client};
-        #    $handle->destroy; # destroy handle
-        #},
+        on_eof   => \&client_quit,
     );
-    warn "Connection from $host:$port ($handle)\n";
-    my $new_user   = Av4::User->new(
-        id    => $handle,
-        queue => [],
-        server => $server,
+    my $new_user = Av4::Entity::Player->new(
+        Av4::Entity::Player->defaults,
+        id                     => $handle,
+        server                 => $server,
+        host                   => $host,
+        port                   => $port,
+        queue                  => [],
+        mcp_packages_supported => {},
+        mcp_authentication_key => '',
+        commands_dispatched    => [],
     );
-    push @{ $server->clients }, $new_user;
-    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_COMPRESS2 ) );
-    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_TTYPE ) );
-    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_NAWS ) );
-    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MSP ) );
-    $handle->push_write( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MXP ) );
-    $handle->push_write( '#$#mcp version: 2.1 to: 2.1' . "\r\n" );
-    my $banner = eval { Av4::HelpParse::areahelp( $new_user->server->helps, '__WELCOME__SCREEN__' )->data };
-    $banner = "Hi, Welcome to the MUD!\r\n" if !defined $banner;
-    $banner .= "\r\n";
-    $handle->push_write($banner);
+    $new_user->telopts( Av4::TelnetOptions->new( user => $new_user ) );
+    push @{ $server->clients },  $new_user;
+    push @{ $server->entities }, $new_user;
+
+    # warn "Connection from $host:$port (H $handle, U $new_user) -- " .
+    #   scalar @{ $server->clients } . " clients / " . scalar @{ $server->entities } .
+    #   " entities online now\n";
+    $Av4::Commands::Basic::wholist = undef;    # invalidate who list
+    $handle->push_write($mud_welcome_banner);
     $handle->on_read( \&client_read );
-    $new_user->print( $new_user->prompt );
-    #sub {
-    #        $stats{recv_bytes} += length $_[0]->rbuf;
-    #        # TODO munge data
-    #        # line has been received
-    #        push @{ $clients{$curr_client}{lines} }, $_[0]->rbuf;
-    #        # clear input buffer - TODO partials
-    #        $_[0]->rbuf = '';
-    #    });
-    ();
+    $new_user->prompt();
+    return;
 }
 
+# This gets called whenever a client has sent something. Various error
+# situations are resolved here either by "just" purging the client, or
+# by making other clients aware the client is quitting.
+# SPAM is handled here (a client having more than 80 commands in their queue).
 sub client_read {
     my $data = $_[0]->rbuf;
     $_[0]->rbuf = '';
@@ -180,330 +411,159 @@ sub client_read {
     if ($@) {
         warn("Quitting client $_[0]: $@\n");
         $_[0]->destroy;
+        $user->id->destroy;
+        $server->clients(  [ grep { defined $_ && $_->id != $_[0] } @{ server->clients } ] );
+        $server->entities( [ grep { defined $_ && $_->id != $_[0] } @{ server->entities } ] );
         return;
     }
-    $server->inbuffer->{$_[0]} .= $data;
-    while ( $server->inbuffer->{$_[0]} =~ s/(.*\n)// ) {
-        my $typed = $1;
-        chomp($typed);
+    $server->inbuffer->{ $_[0] } .= $data;
+    while ( $server->inbuffer->{ $_[0] } =~ s/(.*\n)// ) {
+        my $typed = defined $1 ? $1 : '';
         $typed =~ s/[\x0D\x0A]//gm;
         if ( @{ $user->queue } > 80 && $typed !~ /^\s*quit/ ) {
             $typed = 'quit';
             $user->broadcast(
                 $_[0],
-                ansify("&W") . "$user " . ansify("&G") . "quits due to spamming" . ansify("\n\r"),
-                ansify("&W") . "You "   . ansify("&G") . "quit due to SPAMMING!" . ansify("\n\r"),
+                "$Av4::Utils::ANSI{'&W'}$user $Av4::Utils::ANSI{'&G'}quits due to spamming\n\r",
+                "$Av4::Utils::ANSI{'&W'}You $Av4::Utils::ANSI{'&G'}quit due to SPAMMING!\n\r",
                 1,    # send prompt to others
             );
             warn("Client $_[0] SPAMMING (queue>80) ==> OUT!\n");
+            $user->queue( ['quit'] );
+            $server->inbuffer->{ $_[0] } = '';
+            $user->id->destroy;
+            $server->clients(  [ grep { defined $_ && $_->id != $_[0] } @{ $server->clients } ] );
+            $server->entities( [ grep { defined $_ && $_->id != $_[0] } @{ $server->entities } ] );
         }
         push @{ $user->queue }, $typed;
-        #$cmd_processed++;
-        #$typed =~ s/[\x00-\x19\x80-\xFF]//gi;
-        #$log->info( "Added to command stack for $client: `$typed`:\n\r" . Dump( $user->queue ) );
     }
 
     # commands are now dispatched via tick_commands
 }
 
+# This gets called when a client has received an error. The client is purged
+# from the server and the server goes their merry way.
 sub client_error {
+    my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
+    if ($user) {
+        $user->queue( [] );
+        if ( $user->in_room ) {
+
+            # Player is no longer in the room
+            $user->remove_from_room();
+        }
+    }
+    $server->clients(  [ grep { defined $_ && $_->id != $_[0] } @{ $server->clients } ] );
+    $server->entities( [ grep { defined $_ && $_->id != $_[0] } @{ $server->entities } ] );
     $_[0]->destroy();
+    $Av4::Commands::Basic::wholist = undef;    # invalidate who list
     broadcast(
         $_[0],
-        ansify("&W") . "$_[0] " . ansify("&G") . "quits the MUD due to errors $_[2]" . ansify("\n\r"),
+        "$Av4::Utils::ANSI{'&W'}$_[0] $Av4::Utils::ANSI{'&G'}quits the MUD due to errors $_[2]\n\r",
         '',
-        1,                                       # send prompt to others
+        1,                                     # send prompt to others
     );
     warn("$_[0] quits due to errors: $_[2]\n");
 }
 
+# This gets called whenever a client quits.
+sub client_quit {
+    broadcast(
+        "&W$_[0] &Gquits the MUD\n\r",
+        1,                                     # send prompt to others
+    );
+    my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
+    $server->clients(  [ grep { $_->id ne $_[0] } @{ $server->clients } ] );
+    $server->entities( [ grep { $_->id ne $_[0] } @{ $server->entities } ] );
+    $user->remove_from_room() if ( $user->in_room );
+}
+
+# Broadcast a message to -all- entities (not "just" clients)
 sub broadcast {
     my ( $by, $message, $sendprompt ) = @_;
     ## $log->info("(by $by) Server broadcast: $message");
     $sendprompt = 0 if ( !defined $sendprompt );
 
     # Send it to everyone.
-    foreach my $user ( @{ $server->clients } ) {
-        next if ( !defined $user );
-        $user->print( $message );
-        $user->print( $user->prompt ) if ($sendprompt);
+    foreach my $entity ( @{ $server->entities } ) {
+        next if ( !defined $entity );
+        $entity->print($message);
+        $entity->prompt if ($sendprompt);
     }
 }
 
-sub tick_commands {
+# Players tick: records the amount of connected clients every tick
+sub tick_players {
+    my $t0      = [gettimeofday];
+    my $clients = scalar grep { defined $_ } @{ $server->clients };
+    my $time    = time;
+    push @delta_tick_players, [ $time, $clients ];
+}
+
+# Flush tick: sends buffered data to all clients who need their buffers flushed.
+sub tick_flush {
+    my $t0 = [gettimeofday];
     my @clients = grep { defined $_ } @{ $server->clients };
     $server->clients( \@clients );
-    #return if check_shutdown( $self );
-    foreach my $client ( @{ $server->clients } ) {
-        next if ( !defined $client );
-        $client->delay(
-              $client->delay - 1 >= 0
-            ? $client->delay - 1
-            : 0
-        );
-        my ( $dispatched, $redispatch ) = $client->dispatch_command();
-        if ( defined $dispatched ) {
-            push @{ $client->commands_dispatched }, $dispatched;
-        }
-        #if ( exists $self->server->outbuffer->{ $client->id } ) {
-        #    $kernel->select_write( $client->id, "event_write" );
-        #}
-        redo if ( defined $redispatch && $redispatch );
+    foreach my $client (@clients) {
+        next unless $client->buffer;
+        $client->telopts->send_data( \$client->buffer );
+        $client->buffer(undef);
 
-        #$client->print( $client->prompt )
-        #  if ( defined $dispatched && (
-        #        $dispatched !~ /^\s*quit\s*$/
-        #        && $dispatched !~ /^\s*\@$/
-        #    )
-        #);
+        #$client->buffer_last_flushed(time);
     }
-    #$_[KERNEL]->delay( tick_commands => $tick_commands );
+    my $time = time;
+    push @delta_tick_flush, [ $time, tv_interval( $t0, [gettimeofday] ) ];
+    warn "**** TICK FLUSH LAG *** $delta_tick_flush[-1]->[1] vs $sec_tick_flush\n" if $delta_tick_flush[-1]->[1] > $sec_tick_flush;
 }
 
+# Commands tick: decreases each entity's "delay" by one unit, and executes
+# the first plausible command if/when an entity is not delayed.
+# NOTA BENE: MCP commands (chiefly) cause this to execute more than one command
+# per tick per entity.
+sub tick_commands {
+    my $t0 = [gettimeofday];
+    my @entities = grep { defined $_ } @{ $server->entities };
+    $server->entities( \@entities );
+    foreach my $entity ( @{ $server->entities } ) {
+        next if ( !defined $entity );
+        my $was_delayed = 0;
+        if ( $entity->delay > 0 ) {
+            $was_delayed = 1;
+            $entity->delay(
+                  $entity->delay - $sec_tick_commands >= 0
+                ? $entity->delay - $sec_tick_commands
+                : 0
+            );
+        }
+        my ( $dispatched, $redispatch ) = $entity->dispatch_command();
+        if ( defined $dispatched ) {
+            push @{ $entity->commands_dispatched }, $dispatched;
+        }
+        $entity->prompt() if ( $was_delayed && !$entity->delay );
+        redo if ( defined $redispatch && $redispatch );
+    }
+    my $time = time;
+    push @delta_tick_commands, [ $time, tv_interval( $t0, [gettimeofday] ) ];
+    warn "**** TICK COMMANDS LAG *** $delta_tick_commands[-1]->[1] vs $sec_tick_commands\n" if $delta_tick_commands[-1]->[1] > $sec_tick_commands;
+    scalar @delta_tick_commands > 800 && $quit_program->send("Shut down after 800 command ticks");
+}
+
+# Mobiles tick: the monsters' AI.
+# Currently monsters just send a random command, similarly to how the fuzzier works.
+sub tick_mobiles {
+    my @entities = grep { defined $_ && ref $_ eq 'Av4::Entity::Mobile' } @{ $server->entities };
+    foreach my $entity (@entities) {
+        $entity->random_command();
+    }
+}
+
+# Utility function to shutdown the MUD: broadcasts the shutdown and shuts it down.
 sub shutdown {
     my ( $self, $bywho ) = @_;
     my $shutdown_by = $bywho->id;
-    broadcast($bywho->id,"$shutdown_by initiated shutdown...\n",0);
+    broadcast( $bywho->id, "$shutdown_by initiated shutdown...\n", 0 );
     $quit_program->send($shutdown_by);
 }
-
-sub client_quit {
-    broadcast(
-        "&W$_[0] &Gquits the MUD\n\r",
-        1,    # send prompt to others
-    );
-    $server->clients( [grep { $_->id ne $_[0] } @{$server->clients}] );
-}
-
-
-=for later
-
-{
-    my $shutdown_by = '';
-
-    sub shutdown {
-        my ( $self, $bywho ) = @_;
-        $shutdown_by = $bywho->id;
-        $bywho->server->running(0);
-    }
-    sub shutdown_by { $shutdown_by }
-
-    sub server_shutdown {
-        my @children = $poe_kernel->_data_ses_get_children($poe_kernel);
-        foreach my $child (@children) {
-            warn "Killing child $child\n";
-            $poe_kernel->_data_ses_stop($child);
-        }
-        my $mud_uptime = time() - $mud_start;
-        warn sprintf( "Clients connected: $shutdown_connected\n" );
-        warn sprintf( "MUD chars sent:       %20lu (%20.2f b/s)\n",   $mud_chars_sent,         $mud_chars_sent / $mud_uptime );
-        warn sprintf( "MUD chars sent !mccp: %20lu (%20.2f b/s)\n",   $mud_chars_sent_nonmccp, $mud_chars_sent_nonmccp / $mud_uptime );
-        warn sprintf( "MUD chars sent mccp:  %20lu (%20.2f b/s)\n",   $mud_chars_sent_mccp,    $mud_chars_sent_mccp / $mud_uptime );
-        warn sprintf( "MUD data sent:        %20lu (%20.2f KiB/s)\n", $mud_data_sent,          $mud_data_sent / 1024 / $mud_uptime );
-        warn sprintf( "MUD data sent !mccp:  %20lu (%20.2f KiB/s)\n", $mud_data_sent_nonmccp,  $mud_data_sent_nonmccp / 1024 / $mud_uptime );
-        warn sprintf( "MUD data sent mccp:   %20lu (%20.2f KiB/s)\n", $mud_data_sent_mccp,     $mud_data_sent_mccp /1024 / $mud_uptime );
-        warn sprintf( "Processed %d commands in %d seconds: %2.2f commands/second\n",$cmd_processed,$mud_uptime,($cmd_processed/$mud_uptime));
-        warn sprintf( "Cache hits:           %d\n", $Av4::Utils::hits);
-        warn sprintf( "Cache misses:         %d\n", $Av4::Utils::misses);
-        warn "Stopped now\n";
-    }
-}
-
-sub server_start {
-    my $self     = $_[HEAP];
-    my $listener = IO::Socket::INET->new(
-        LocalPort => $listen_port,
-        Listen    => 50,
-        Reuse     => "yes",
-        Blocking  => 0,
-    ) or die "can't make server socket: $@\n";
-    $_[KERNEL]->select_read( $listener, "event_accept" );
-    $_[KERNEL]->delay( tick_commands => 0 );
-}
-
-sub check_shutdown {
-    my ( $self, $kernel ) = @_;
-    return 0 if $self->server->running;
-    $shutdown_connected = scalar @{ $self->server->clients };
-    foreach my $client ( @{ $self->server->clients } ) {
-        next if ( !defined $client );
-        $client->print( "\n\nShutting down -- Initiated by ", shutdown_by(), "\n\n" );
-        $kernel->select_write( $client->id, 'event_write' );
-    }
-    $kernel->delay( shutdown => 1 );
-    return 1;
-}
-
-sub server_accept {
-    my ( $self, $kernel, $server ) = @_[ HEAP, KERNEL, ARG0 ];
-    my $new_client = $server->accept();
-    my $new_user   = Av4::User->new(
-        id    => $new_client,
-        queue => [],
-        server => $self->server,
-    );
-    push @{ $self->server->clients }, $new_user;
-    $new_user->print( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_COMPRESS2 ) );
-    $new_user->print( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_TTYPE ) );
-    $new_user->print( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_DO,   TELOPT_NAWS ) );
-    $new_user->print( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MSP ) );
-    $new_user->print( sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MXP ) );
-    $new_user->print( '#$#mcp version: 2.1 to: 2.1', "\r\n" );
-    $new_user->print("Hi, Welcome to the MUD!\r\n\r\n"); # FIXME BANNER
-    $new_user->print( $new_user->prompt );
-
-    $new_user->print(sprintf "\33]0;Av4 - $new_user\a");
-    $kernel->select_read( $new_client, "event_read" );
-}
-
-sub __data_log {
-    my ( $direction, $client, $datastr ) = @_;
-    my $datalog = Log::Log4perl->get_logger('Av4.datalog');
-    my @data = split( '', $datastr );
-    foreach my $data (@data) {
-        $datalog->debug( "$direction $client: [", join( ',', unpack( 'C*', $data ) ), "]" );
-    }
-}
-
-sub client_read {
-    my ( $self, $kernel, $client ) = @_[ HEAP, KERNEL, ARG0 ];
-    my $log = get_logger();
-    my ($user) =
-      grep { defined $_ && $_->id == $client } @{ $self->server->clients };
-    die "Cant find user $client in clients!" if ( !defined $user );
-    my $data = "";
-    my $rv = $client->recv( $data, POSIX::BUFSIZ, 0 );
-    unless ( defined($rv) and length($data) ) {
-        $kernel->yield( event_error => $client );
-        return;
-    }
-
-    #__data_log( 'Received from', $client, $data );    # ONLY FOR DEBUG!
-    #eval { $data = $self->_analyze_data( $data, $client ); };
-    eval { $data = $user->received_data($data); };
-    if ($@) {
-        $log->error("Quitting client $client: $@");
-        $kernel->yield( event_write => $client );    # flushes all output
-        $kernel->yield( event_error => $client );    # quits
-             #$user->commands->cmd_get('quit')->( $kernel, $client, $user, undef );
-        return;
-    }
-    $self->server->inbuffer->{$client} .= $data;
-    while ( $self->server->inbuffer->{$client} =~ s/(.*\n)// ) {
-        my $typed = $1;
-        chomp($typed);
-        $typed =~ s/[\x0D\x0A]//gm;
-        if ( @{ $user->queue } > 80 && $typed !~ /^\s*quit/ ) {
-            $typed = 'quit';
-            $user->broadcast(
-                $kernel, $client,
-                "&W$user &Gquits due to spamming\n\r",
-                "&WYou &Gquit due to SPAMMING!\n\r",
-                1,    # send prompt to others
-            );
-            $log->info("Client $client SPAMMING (queue>80) ==> OUT!");
-        }
-        push @{ $user->queue }, $typed;
-        #$cmd_processed++;
-        #$typed =~ s/[\x00-\x19\x80-\xFF]//gi;
-        #$log->info( "Added to command stack for $client: `$typed`:\n\r" . Dump( $user->queue ) );
-    }
-
-    # commands are now dispatched via tick_commands
-}
-
-sub client_write {
-    my ( $self, $kernel, $client ) = @_[ HEAP, KERNEL, ARG0 ];
-
-    #my $log = get_logger();
-    #$log->info("Entered client_write for client $client");
-    unless ( exists $self->server->outbuffer->{$client} ) {
-        #$kernel->select_write($client);
-        #$log->info("No data to be sent for client $client");
-        return;
-    }
-
-    my ($user) =
-      grep { defined $_ && $_->id == $client } @{ $self->server->clients };
-    die "Cant find user $client in clients!" if ( !defined $user );
-
-    #__data_log( 'Sent to', $client, $self->server->outbuffer->{$client} );
-
-    my $data       = $self->server->outbuffer->{$client};
-    my $datalength = length $data;
-
-    my $rv;
-    eval {
-        $rv = $client->send( $data, 0 );
-        if ($@) {
-            get_logger()->warn("Error Client->send: $@");
-            $kernel->yield( event_error => $client );
-            return;
-        }
-    };
-    unless ( defined $rv ) {
-        get_logger->warn("Client $client: Cant send data\n");
-        return;
-    }
-    if (   $rv == $datalength
-        or $! == POSIX::EWOULDBLOCK )
-    {
-        delete $self->server->outbuffer->{$client};
-        return;
-    }
-    get_logger->warn("Client $client: error ->send\n");
-    $kernel->yield( event_error => $client );
-}
-
-sub broadcast {
-    my ( $self, $kernel, $message, $sendprompt ) = @_;
-    $sendprompt = 0 if ( !defined $sendprompt );
-    my $log = get_logger();
-    $log->info("Server broadcast: $message");
-
-    # Send it to everyone.
-    foreach my $user ( @{ $self->server->clients } ) {
-        next if ( !defined $user );
-        #$log->info("Sending broadcast to client $user");
-        $user->print( ansify( $message ));
-        $user->print( $user->prompt ) if ($sendprompt);
-        $kernel->yield( event_write => $user->id );
-    }
-}
-
-sub client_error {
-    my ( $self, $kernel, $client ) = @_[ HEAP, KERNEL, ARG0 ];
-    my $log = get_logger();
-    $self->broadcast(
-        $kernel,
-        "&W$client &Gquits the MUD due to errors\n\r",
-        1,                                       # send prompt to others
-    );
-    $kernel->yield( event_done => $client );
-}
-
-sub client_done {
-    my ( $self, $kernel, $client ) = @_[ HEAP, KERNEL, ARG0 ];
-    my $log = get_logger();
-    delete $self->server->inbuffer->{$client};
-    delete $self->server->outbuffer->{$client};
-
-    # remove from @clients
-    for ( 0 .. $#{ $self->server->clients } ) {
-        next if ( !defined $self->server->clients->[$_] );
-        if ( $self->server->clients->[$_]->id == $client ) {
-            delete $self->server->clients->[$_];
-            last;
-        }
-    }
-    my @clients = grep { defined $_ } @{ $self->server->clients };
-    $self->server->clients( \@clients );
-    $kernel->select($client);
-    close $client;
-    $log->info("Session ended for client $client");
-}
-
-=cut
-
 
 1;

@@ -11,52 +11,93 @@
 
 ~
 
-0 !~
-Syntax: !
-
-! should repeat the last command you typed.
-It is NOT implemented.
-~
-
-0 HELP~
-To use the help facility, type:
-
-    &Whelp &R<keyword>&^
-
-For example, "help anacronia".
-
-For a (long) list of help topics, type:
-
-    &Whlist <free text>&^
-
-You can use hlist to narrow down the list of pages to the ones which contain
-the text you specify. For example, "hlist v4" would show the help pages which
-contain that word.
-~
-
 0 ANACRONIA V4~
 &WAnacronia V4&^ is the fourth rewrite of a Multi User Dungeon (MUD), a
 multi-user internet gaming system. It is written in the Perl programming
 language, and uses "modern" technologies and modules, such as AnyEvent,
 Gearman, and Memcache.
 
-Anacronia v4 - Copyright (c) 2009,2010 Marco Fontani - MFONTANI at CPAN dot ORG
+Anacronia v4 - Copyright (c) 2009-2011 Marco Fontani - MFONTANI at CPAN dot ORG
 Released under the GPL v.3.0 license
 ~
 
+0 HELP HLIST~
+To use the help facility, type: &Yhelp &R<keyword>&^
+    For example, "&Yhelp anacronia&^".
+For a (long) list of help topics, type: &Yhlist <free text>&^
+    For example, "&Yhlist mud&^".
+
+You can use &Yhlist&^ to narrow down the list of pages to the ones which contain
+the text you specify. For example, "&Yhlist v4&^" would show the help pages whose
+keywords contain that word.
+~
+
 0 COMMANDS COMMAND QUEUE QUEUES~
-In many MUDs commands are parsed and executed in a first-come first-served fashion:
-if the character is currently performing an action which delays (casting a spelli for
-example), any other command (including non-delaying ones such as SCORE) need to wait
-for the first command to be executed.
-In other mode modern MUDs there may be multiple command queues which allow the player
-to perform delaying actions which don't overlap with each other. For example, using
-an attack prevents the player from attacking again before N seconds, but meanwhile
-the player can still ready a defensive command or see their statistics.
-Anacronia V4 implements a queue system in which all the unknown commands are weeded
-out of the command queue, and commands are executed in order of priority. Adding
-specific queue types (attack, defense, movement) is on the roadmap and should be
-fairly easy to implement.
+In many MUDs commands are parsed and executed in a first-come first-served
+fashion: if the character is currently performing an action which delays
+(casting a spell for example), any other command (including non-delaying ones
+such as &YSCORE&^) need to wait for the first command to be executed.
+
+In other mode modern MUDs there may be multiple command queues which allow the
+player to perform delaying actions which don't overlap with each other. For
+example, using an attack prevents the player from attacking again before N
+seconds, but meanwhile the player can still ready a defensive command or see
+their statistics.
+
+Anacronia V4 implements a queue system in which all the unknown commands are
+weeded out of the command queue, and commands are executed in order of
+priority. Adding specific queue types (attack, defense, movement) is on the
+roadmap and should be fairly easy to implement.
+
+There is not yet a command which lists all available commands.
+
+The command "&YCOMMANDS&^" allows one to see which commands are currently in
+their queue, ready to be executed whenever a player's delay allows it.
+~
+
+0 SHOUT~
+When you &Yshout phrase&^ the &Yphrase&^ will be shown to all the users currently
+connected to the game.
+
+The &Yphrase&^ can contain coloured text (see the command &Ycolors&^).
+
+This command delays.
+~
+
+0 COLORS COLOURS~
+You can use the &Ycolors&^ command to show the various characters which can be
+combined in order to shout or display ANSI coloured strings.
+
+The command will also show you 255 ANSI colours and shades of grey, so you can
+determine whether your terminal supports them.
+~
+
+0 WHO ONLINE~
+The &YWHO&^ command displays a list of all the currently connected users.
+
+For each, it will display whether their client supports any of the MUD-recognised
+extensions (MCCP, etc).
+
+Admins are able to see the IP and port of each connection.
+~
+
+0 STATS STATISTICS~
+The &YSTATS&^ command displays statistics about your connection.
+
+It will show you what the MUD recognises as being your terminal's width/height, as
+well as which of the MUD-recognised extensions (MCCP, MXP, etc) your client seems
+to be supporting, and whether they are enabled.
+
+Additionally, the command shows some server statistics, such as the number of
+characters and data bytes sent to the connections, and the resulting current MCCP2
+compression ratio.
+~
+
+0 @SHUTDOWN SHUTDOWN~
+The administrative command &Y@SHUTDOWN&^ allows an admin to shutdown the MUD.
+
+The service will not be restarted, and the executable will show some statistics about
+the connections and the data transferred during the time the MUD was running.
 ~
 
 0 $~

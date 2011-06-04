@@ -1,12 +1,12 @@
 use strict;
 
 use File::Spec;
-use lib File::Spec->catdir('lib');          # use our self to install
+use lib File::Spec->catdir('lib');    # use our self to install
 
 # We use Module::Build to test & install itself.
 use Module::Build;
 
-# 
+#
 
 my $build = Module::Build->new(
     module_name  => 'Av4',
@@ -19,7 +19,7 @@ my $build = Module::Build->new(
         'AnyEvent::Socket'          => 0,
         'Cache::Memcached::Fast'    => 0,
         'Class::XSAccessor'         => 0,
-        'Compress::Zlib'            => 0,
+        'Compress::Raw::Zlib'       => 0,
         'Digest::MD5'               => 0,
         'EV'                        => 0,
         'Fatal'                     => 0,
@@ -35,4 +35,5 @@ my $build = Module::Build->new(
 );
 
 $build->create_build_script;
+
 # vim:ts=2:sw=2:et:sta

@@ -7,45 +7,25 @@ use Av4::Commands::Delegated;
 use Av4::Commands::MCP;
 use Av4::Commands::MXP;
 
-use Class::XSAccessor {
-    constructor => '_new',
-    accessors => [qw/commands keywords data/],
-};
-
-sub new {
-    my $class = shift;
-    my $self = $class->_new(
-        # defaults
-        commands => {},
-        keywords => '',
-        data => '',
-        # wanted options
-        @_,
-    );
-    $self->_add_mcp_commands();
-    $self->_add_mxp_commands();
-    $self->_add_basic_commands();
-    $self->_add_admin_commands();
-    $self->_add_delegated_commands();
-    $self;
-}
-
-#    handles  => {
-#        all_cmds   => 'keys',
-#        cmd_get    => 'get',
-#        cmd_set    => 'set',
-#    },
+our %commands;
+__PACKAGE__->_add_mxp_commands();
+__PACKAGE__->_add_mcp_commands();
+__PACKAGE__->_add_basic_commands();
+__PACKAGE__->_add_movement_commands();
+__PACKAGE__->_add_delegated_commands();
+__PACKAGE__->_add_admin_commands();
 
 sub cmd_set {
-    my ($self,$what,$data) = @_;
-    $self->commands->{lc $what} = $data;
-}
-sub cmd_get {
-    my ($self,$what) = @_;
-    $self->commands->{lc $what};
+    my ( $self, $what, $data ) = @_;
+    $commands{ lc $what } = $data;
 }
 
-sub exists {
+sub cmd_get {
+    my ( $self, $what ) = @_;
+    $commands{ lc $what };
+}
+
+sub cmd_exists {
     my ( $self, $which ) = @_;
     $which = lc $which;
     my $it = $self->cmd_get($which);
@@ -137,13 +117,22 @@ sub _add_basic_commands {
             name     => 'shout',
             priority => 50,
             code     => \&Av4::Commands::Basic::cmd_shout,
-            delays   => 2,
+            delays   => 2.5,
+        )
+    );
+    $self->cmd_set(
+        'say',
+        Av4::Command->new(
+            name     => 'say',
+            priority => 49,
+            code     => \&Av4::Commands::Basic::cmd_say,
+            delays   => 0.9,
         )
     );
     $self->cmd_set(
         'colors',
         Av4::Command->new(
-            name     => 'help',
+            name     => 'colors',
             priority => 100,
             code     => \&Av4::Commands::Basic::cmd_colors,
             delays   => 1,
@@ -159,12 +148,30 @@ sub _add_basic_commands {
         )
     );
     $self->cmd_set(
+        'hlist',
+        Av4::Command->new(
+            name     => 'hlist',
+            priority => 100,
+            code     => \&Av4::Commands::Basic::cmd_hlist,
+            delays   => 1,
+        )
+    );
+    $self->cmd_set(
+        'look',
+        Av4::Command->new(
+            name     => 'look',
+            priority => 120,
+            code     => \&Av4::Commands::Basic::cmd_look,
+            delays   => 1,
+        )
+    );
+    $self->cmd_set(
         'who',
         Av4::Command->new(
             name     => 'who',
             priority => 80,
             code     => \&Av4::Commands::Basic::cmd_who,
-            delays   => 5,
+            delays   => 2,
         )
     );
     $self->cmd_set(
@@ -182,7 +189,16 @@ sub _add_basic_commands {
             name     => 'stats',
             priority => 999,
             code     => \&Av4::Commands::Basic::cmd_stats,
-            delays   => 0,
+            delays   => 0.2,
+        )
+    );
+    $self->cmd_set(
+        'areas',
+        Av4::Command->new(
+            name     => 'areas',
+            priority => 900,
+            code     => \&Av4::Commands::Basic::cmd_areas,
+            delays   => 2,
         )
     );
     $self->cmd_set(
@@ -196,6 +212,30 @@ sub _add_basic_commands {
     );
 }
 
+sub _add_movement_commands {
+    my $self = shift;
+    $self->cmd_set( 'n',
+        Av4::Command->new( name => 'n', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'North' ) }, delays => 0.3, ) );
+    $self->cmd_set( 'e',
+        Av4::Command->new( name => 'e', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'East' ) }, delays => 0.3, ) );
+    $self->cmd_set( 's',
+        Av4::Command->new( name => 's', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'South' ) }, delays => 0.3, ) );
+    $self->cmd_set( 'w',
+        Av4::Command->new( name => 'w', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'West' ) }, delays => 0.3, ) );
+    $self->cmd_set( 'u',
+        Av4::Command->new( name => 'u', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'Up' ) }, delays => 0.3, ) );
+    $self->cmd_set( 'd',
+        Av4::Command->new( name => 'd', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'Down' ) }, delays => 0.3, ) );
+    $self->cmd_set( 'ne',
+        Av4::Command->new( name => 'ne', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'NorthEast' ) }, delays => 0.3, ) );
+    $self->cmd_set( 'nw',
+        Av4::Command->new( name => 'nw', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'NorthWest' ) }, delays => 0.3, ) );
+    $self->cmd_set( 'se',
+        Av4::Command->new( name => 'se', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'SouthEast' ) }, delays => 0.3, ) );
+    $self->cmd_set( 'sw',
+        Av4::Command->new( name => 'sw', priority => 1, code => sub { Av4::Commands::Basic::cmd_move( @_, 'SouthWest' ) }, delays => 0.3, ) );
+}
+
 sub _add_delegated_commands {
     my $self = shift;
     $self->cmd_set(
@@ -204,7 +244,7 @@ sub _add_delegated_commands {
             name     => 'power',
             priority => 1,
             code     => \&Av4::Commands::Delegated::cmd_power,
-            delays => 5,
+            delays   => 5,
         )
     );
 }
@@ -217,6 +257,23 @@ sub _add_admin_commands {
             name     => 'debug',
             priority => 1,
             code     => \&Av4::Commands::Basic::cmd_debug,
+        )
+    );
+    $self->cmd_set(
+        '@goto',
+        Av4::Command->new(
+            name     => '@goto',
+            priority => 9900,
+            code     => \&Av4::Commands::Basic::cmd_goto,
+            delays   => 0.5,
+        )
+    );
+    $self->cmd_set(
+        '@mpall',
+        Av4::Command->new(
+            name     => '@mpall',
+            priority => 9900,
+            code     => \&Av4::Commands::Basic::cmd_mpall,
         )
     );
     $self->cmd_set(

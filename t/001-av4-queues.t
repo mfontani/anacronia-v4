@@ -5,7 +5,7 @@ use Test::More;
 
 BEGIN {
     use_ok( 'Av4' );
-    use_ok( 'Av4::User' );
+    use_ok( 'Av4::Entity::Player' );
 }
 
 {
@@ -15,7 +15,7 @@ BEGIN {
 }
 
 can_ok ('Av4', qw/client_read/);
-can_ok ('Av4::User', qw/dispatch_command/);
+can_ok ('Av4::Entity::Player', qw/dispatch_command/);
 
 my $srv;
 eval {
@@ -27,23 +27,25 @@ ok(!$@, "creating Av4::Server OK") or diag("Cannot create Av4::Server: $@");
 
 my $user;
 eval {
-    $user = Av4::User->new(
+    $user = Av4::Entity::Player->new(
         server => $srv,
         id => Av4::PushWrite::Mock->new,
     );
     $user->state(1);
 };
-ok(!$@, "creating Av4::User OK") or do {
-    die("Cannot create Av4::User via given Av4::Server: $@");
+ok(!$@, "creating Av4::Entity::Player OK") or do {
+    die("Cannot create Av4::Entity::Player via given Av4::Server: $@");
 };
-ok(!@{$user->queue},"User has empty queue when created");
+# Player
+ok(!defined $user->queue,"Player has undef queue when created");
+$user->queue([]);
 
 $srv->clients([$user]);
 ok(1==@{$srv->clients},"Server has one client connected");
 
 {
     my $str = $user->dumpqueue();
-    ok($str =~ /^Queue for user Av4::User=HASH\(0x[0-9a-f]+\):\n$/gm, "Expected message for empty queue")
+    ok($str =~ /^Queue for user Av4::Entity::Player=HASH\(0x[0-9a-f]+\):\n$/gm, "Expected message for empty queue")
         or diag("Queue message doesn't match:\n~$str~");
 }
 
@@ -52,7 +54,7 @@ ok(1==@{$srv->clients},"Server has one client connected");
     my $str = $user->dumpqueue();
     my @lines = split(/\n/,$str);
     ok(2==@lines,"Got 2 lines from queue");
-    ok($lines[0] =~ /^Queue for user Av4::User=HASH\(0x[0-9a-f]+\):$/, "Expected first line")
+    ok($lines[0] =~ /^Queue for user Av4::Entity::Player=HASH\(0x[0-9a-f]+\):$/, "Expected first line")
         or diag("Line 0 not what expected: ~$lines[0]~");
     ok($lines[1] =~ /^#0  D n\/a PRI n\/a \[UNKNOWN\] unknown_command$/, "Expected second line")
         or diag("Line 1 not what expected: ~$lines[1]~");
@@ -64,7 +66,7 @@ sub dumpqueue_test_n_commands {
     my $str = $user->dumpqueue();
     my @lines = split(/\n/,$str);
     ok((@$expe+1)==@lines,"Got " . (1+scalar @$cmds) . " lines from queue");
-    ok($lines[0] =~ /^Queue for user Av4::User=HASH\(0x[0-9a-f]+\):$/, "Expected first line")
+    ok($lines[0] =~ /^Queue for user Av4::Entity::Player=HASH\(0x[0-9a-f]+\):$/, "Expected first line")
         or diag("Line 0 not what expected: ~$lines[0]~");
     for (0..$#$expe) {
         my $n = $_+1;
@@ -116,7 +118,7 @@ sub dispatch_test_n_commands {
         my $str = $user->dumpqueue();
         my @lines = split(/\n/,$str);
         ok((@$expe+1)==@lines,"Got " . (scalar @$expe+1) . " lines from queue") or diag("Got " . @lines . " from the queue instead of " . (@$expe+1) . ":\n$str\n");
-        ok($lines[0] =~ /^Queue for user Av4::User=HASH\(0x[0-9a-f]+\):$/, "Expected first line")
+        ok($lines[0] =~ /^Queue for user Av4::Entity::Player=HASH\(0x[0-9a-f]+\):$/, "Expected first line")
             or diag("Line 0 not what expected: ~$lines[0]~");
         for (0..$#$expe) {
             ok(defined $expe->[$_], 'expected is defined');

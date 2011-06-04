@@ -1,32 +1,71 @@
 #!/usr/bin/env perl
+use 5.010_001;    # at least
+use strict;
+use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use lib './lib';
+
+# Ensure the wanted AnyEvent implementation is loaded on OSX
+BEGIN {
+    if ( $^O eq 'darwin' ) {
+        require AnyEvent::Impl::Event;
+    }
+    else {
+        require AnyEvent::Impl::EV;
+    }
+}
 use Av4;
 
+# Show the implementation being used, or die if it tries to use the pure-Perl version
+{
+    warn "\e[0mUsing \e[35mIO::Async\e[0m event loop...\n"
+      if exists $INC{'AnyEvent/Impl/IOAsync.pm'};
+    warn "\e[0mUsing \e[35mEvent\e[0m event loop...\n"
+      if exists $INC{'AnyEvent/Impl/Event.pm'};
+    warn "\e[0mUsing \e[32mEV\e[0m event loop...\n"
+      if exists $INC{'AnyEvent/Impl/EV.pm'};
+    die "\e[0mRefusing to run under \e[31mPerl\e[0m event loop...\nPlease install either Event, IO::Async or EV, and load them in ./mud\n"
+      if exists $INC{'AnyEvent/Impl/Perl.pm'};
+}
+
+my $address       = undef;
 my $port          = 0;
 my $tick_commands = 0;
+my $tick_mobiles  = 0;
+my $tick_flush    = 0;
 my $fake          = 0;
 my $helpfile      = '';
+my $areadir       = '';
 my $show_help     = 0;
 my $show_man      = 0;
 
 GetOptions(
-  'help!'           => \$show_help,
-  'man!'            => \$show_man,
-  'port=i'          => \$port,
-  'fake!'           => \$fake,
-  'tick_commands=i' => \$tick_commands,
-  'helpfile=s'      => \$helpfile,
+    'help!'           => \$show_help,
+    'man!'            => \$show_man,
+    'address=s'       => \$address,
+    'port=s'          => \$port,
+    'fake!'           => \$fake,
+    'tick_commands=s' => \$tick_commands,
+    'tick_mobiles=s'  => \$tick_mobiles,
+    'tick_flush=s'    => \$tick_flush,
+    'helpfile=s'      => \$helpfile,
+    'areadir=s'       => \$areadir,
 ) or pod2usage(2);
 pod2usage(1) if $show_help;
 pod2usage( -exitstatus => 0, -verbose => 2 ) if $show_man;
 
+die "Don't even try running this on a port <= 1024!\n" if $port && $port <= 1024;
+
 my $av4 = Av4->new(
-  ( $port          ? ( port          => $port )                : () ),
-  ( $fake          ? ( fake          => $fake )                : () ),
-  ( $tick_commands ? ( tick_commands => $tick_commands / 100 ) : () ),
-  ( $helpfile      ? ( helpfile      => $helpfile )            : () ),
+    ( $address       ? ( listen_address => $address )       : () ),
+    ( $port          ? ( listen_port    => $port )          : () ),
+    ( $fake          ? ( fake           => $fake )          : () ),
+    ( $tick_commands ? ( tick_commands  => $tick_commands ) : () ),
+    ( $tick_mobiles  ? ( tick_mobiles   => $tick_mobiles )  : () ),
+    ( $tick_flush    ? ( tick_flush     => $tick_flush )    : () ),
+    ( $helpfile      ? ( helpfile       => $helpfile )      : () ),
+    ( $areadir       ? ( areadir        => $areadir )       : () ),
 );
 $av4->run;
 
@@ -52,24 +91,43 @@ Prints a brief help message and exits.
 
 Prints the manual page and exits.
 
-=item B<-port> NNN
+=item B<-address> IP or C<unix/>
 
-Sets the port the mud will listen to (defaults to 8081)
+Sets the address the mud will listen to (defaults to undef, for all interfaces).
+In order to bind to a UNIX socket, use the value C<unix/> here.
+
+=item B<-port> NNN or /path/to/unix/socket
+
+Sets the port the mud will listen to (defaults to 8081).
+In order to bind to a UNIX socket, use the path to the socket here.
+Do B<NOT> specify a value E<lt> 1024 here, thanks.
 
 =item B<-fake>
 
-If set, the POE sessions are not started.
+If set, the sessions are not started.
 
 =item B<-tick_commands> NNMM
 
-Sets how often (in centiseconds) commands are processed for clients (defaults to 100, for every second).
-This parameter is actually divided by 100 before being passed to the Av4 constructor.
+Sets how often commands are processed for clients (defaults to whatever is in Av4).
+
+=item B<-tick_mobiles> NNMM
+
+Sets how often mobiles perform random actions (defaults to whatever is in Av4).
+
+=item B<-tick_flush> NNMM
+
+Sets how often clients' buffers are flushed (defaults to whatever is in Av4).
 
 =item B<-helpfile> filename.are
 
 Sets the filename (help.are from smaug format) which should be parsed in order to
 make help pages available to clients. Defaults to help.are in the developer's
 home directory.
+
+=item B<-areadir> areas/
+
+Sets the directory which contains area files (in smaug format, kind of) which
+should be used to load areas from. Defaults to C<areas/>.
 
 =back
 
@@ -78,6 +136,6 @@ home directory.
 B<This program> launches a daemon running on the port specified, which acccepts
 connections and replies to the commands the clients give it. A C<help.are> file
 is parsed for help pages, and the help pages are made available to the clients
-through the C<help> in-game command.
+through the C<help> and C<hlist> in-game commands.
 
 =cut

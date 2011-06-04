@@ -11,11 +11,10 @@ sub cmd_mxp {
     my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
     $log->info("Got MXP command: `$argstr`");
-    $user->print("\r\n\e[0z$argstr\r\n");
-    $user->print("\r\n\e[1z$argstr\r\n");
-    $user->print("\r\n\e[2z$argstr\r\n");
-    $user->print("\e[7z"); # reset default locked mode
-    return 0;
+    return [
+        0,
+        "\r\n\e[0z$argstr\r\n" . "\r\n\e[1z$argstr\r\n" . "\r\n\e[2z$argstr\r\n" . "\e[7z"    # reset default locked mode
+    ];
 }
 
 # Got MXP reply: <VERSION MXP="0.5" CLIENT=MUSHclient VERSION="4.71" REGISTERED=YES>
@@ -23,8 +22,7 @@ sub cmd_mxp_option {
     my ( $client, $user, $argstr ) = @_;
     my $log = get_logger();
     $argstr =~ s/\e\[\dz//gi;
-    $user->print("Got MXP reply: $argstr\r\n");
     warn("Got MXP reply: $argstr\r\n");
-    return 0;
+    return [ 0, "Got MXP reply: $argstr\r\n" ];
 }
 1;

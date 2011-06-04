@@ -1,26 +1,36 @@
 package Av4::Server;
 use strict;
 use warnings;
-use Av4::Help;
-use Av4::User;
 
 use Class::XSAccessor {
     constructor => '_new',
-    accessors => [ qw/helps inbuffer outbuffer clients running/ ],
+    accessors   => [qw/helps areas inbuffer outbuffer entities clients running/],
 };
 
 sub new {
     my $class = shift;
     $class->_new(
+
         # defaults
-        helps => [],
-        inbuffer => {},
+        helps     => [],
+        areas     => [],
+        inbuffer  => {},
         outbuffer => {},
-        clients => [],
-        running => 1,
+        entities  => [],
+        clients   => [],
+        running   => 1,
+
         # wanted options
         @_,
     );
+}
+
+sub client_by_id {
+    my ( $self, $id ) = @_;
+    for ( @{ $self->clients } ) {
+        return $_ if $_->id eq $id;
+    }
+    return;
 }
 
 1;

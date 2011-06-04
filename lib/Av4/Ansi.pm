@@ -2,7 +2,7 @@ package Av4::Ansi;
 use strict;
 use warnings;
 
-use Inline C  => <<'END_INLINE_C';
+use Inline C => <<'END_INLINE_C';
     unsigned char __colors[8] = "xrgybpcw";
     unsigned char getcolor(unsigned char clrchar) {
         char i = 0;
@@ -14,7 +14,7 @@ use Inline C  => <<'END_INLINE_C';
     }
 END_INLINE_C
 
-our ( $amp, $car, $bang ) = (ord('&'), ord('^'),ord('!'));
+our ( $amp, $car, $bang ) = ( ord('&'), ord('^'), ord('!') );
 
 sub ansify {
     my $string    = shift;
@@ -34,7 +34,7 @@ sub ansify {
     $status->{prevblink} = ''    if ( !defined $status->{prevblink} );
     my ( $newfg, $newbg, $newbold ) = ( $status->{prevfg}, $status->{prevbg}, $status->{prevbold} );
 
-    my @str = unpack('C*',$string);
+    my @str = unpack( 'C*', $string );
     foreach my $i ( 0 .. $#str ) {
         if ( !$status->{cmdfound} ) {    # previous character wasn't a control charaacter
             if ( $str[$i] != $amp && $str[$i] != $car ) {
@@ -99,17 +99,19 @@ sub ansify {
         my $newcol = getcolor( $str[$i] );
         if ( $newcol >= 255 ) { $status->{cmdfound} = 0; next }    # TODO: handle blink?
 
-        if ( $status->{cmdfound} == $amp ) {                     # foreground
+        if ( $status->{cmdfound} == $amp ) {                       # foreground
             $status->{prevfg} = $newfg;
             $newfg = 30 + $newcol;
-        } else { #  ( $status->{cmdfound} == $car ) {                # background
+        }
+        else {                                                     #  ( $status->{cmdfound} == $car ) {                # background
             $status->{prevbg} = $newbg;
             $newbg = 40 + $newcol;
         }
-        if ( $str[$i] >= 65 && $str[$i] < 97) {                     # uppercase, bold
+        if ( $str[$i] >= 65 && $str[$i] < 97 ) {                   # uppercase, bold
             $status->{prevbold} = $newbold;
             $newbold = '1;';
-        } else {
+        }
+        else {
             $status->{prevbold} = $newbold;
             $newbold = '22;';
         }
@@ -132,7 +134,8 @@ sub ansify {
     chomp($out2);
     if ( $out2 ne $out ) {    # newline needs added at end
         $out = $out2 . "\033[0m\n\r";
-    } else {
+    }
+    else {
 
         #$out = $out2 . "\033[0m";
     }

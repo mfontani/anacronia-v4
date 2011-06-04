@@ -1,0 +1,16 @@
+#!/bin/bash
+if [[ -z $1 ]]; then
+    echo "Need to know how many fuzziers you want to launch..."
+    exit -1
+fi
+if [[ -z $2 ]]; then
+    echo "ATTENTION: the fuzziers will be launched with no additional arguments.."
+    echo "You can launch this as: $0 NN --clients N --host XX --port YY --mccp"
+fi
+FUZZIERS=$1
+shift
+for i in $(perl -le'$n=shift;print join(" ",1..$n);' $FUZZIERS); do
+    echo "perl scripts/fuzzier.pl $@ 2>/dev/null &"
+    perl scripts/fuzzier.pl $@ 2>/dev/null &
+done
+echo "Done.."

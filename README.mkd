@@ -1,0 +1,271 @@
+What is this?!
+==============
+
+Anacronia v4 - Copyright (c) 2009-2011 Marco Fontani - MFONTANI at CPAN dot ORG
+Released under the GPL v.3.0 license -- see LICENSE
+
+Anacronia V4 is the fourth rewrite of a Multi User Dungeon (MUD), a multi-user
+internet gaming system. It is written in the Perl programming language, and
+uses "modern" technologies and modules, such as AnyEvent and Memcached.
+
+In any examples in this document the "$ " indicates the shell prompt; anything
+after it indicates the command you should type. Any lines after it, unless it
+also starts with a "$ ", indicates the output the command should give.
+
+FOREWORD
+========
+
+This MUD cannot (yet) be used as-is. In its current status in the "master"
+branch, it will merely start up and shut down my itself after a number of
+ticks, whilst gathering statistics.
+
+Prerequisites
+=============
+
+In order to start the MUD, you'll need the following Perl modules installed.
+You will also need a working C compiler, as the program uses Inline::C.
+You may want to use App::cpanminus to install these, as that allows you to
+have them installed in your $HOME rather than system wide.
+Patches to create a local::lib with the prerequisite modules installed under
+inc/ are welcome.
+
+    Getopt::Long                    Used to get command-line args for "mud"
+    Pod::Usage                      Used to show the manpage for "mud"
+    Digest::MD5                     Used to calculate Memcache keys for help pages
+    AnyEvent                        Async event loop that makes the mud "tick"
+    AnyEvent::Gearman::Client       Cmds involving delegating commands to workers
+    AnyEvent::Handle                Handles server/clients
+    AnyEvent::Socket                Handles low-level sockets asynchronously
+    Cache::Memcached::Fast          To cache ansified help pages, and soon more
+    Class::XSAccessor               Used to generate r/w getters/setters
+    Compress::Raw::Zlib             Used for MCCP (compression) support
+    Inline::C                       Allows very performant C routines to be called
+    Log::Log4perl                   For debugging and logging purposes
+    Time::HiRes                     Very precise timings and time differences
+    YAML                            Debugging and dumping data structures
+    Chart::Clicker                  For creating nice charts
+
+    The following event loops (supported by AnyEvent) are suggested to be installed,
+    for the server to be as performant as it can be. The "mud" executable will require
+    and load Event on OSX and EV otherwise. The "mud" executable will refuse to run if
+    it senses it would run under the "default" pure-Perl event loop.
+        EV                          For Linux; seems to not work correctly on OSX
+        Event                       For OSX
+
+You may install the prerequisite modules by issuing commands similar to the following:
+
+    $ cpan  Digest::MD5
+    $ cpanm Digest::MD5
+
+A Build.PL file is also included, and it may (or may not) help you installing
+the right prerequisites, too.
+
+Launching the MUD
+=================
+
+Once the prerequisite modules are installed and working, you can launch the
+MUD by typing, in the root of this repository:
+
+    $ perl mud
+    [...] lots of output
+    TCP ready on address * port 8081
+
+The "mud" program accepts several options; you can see these options by
+typing the following:
+
+    $ perl mud --help
+    Usage:
+        ./mud [options]
+    #  ..  follows list of options
+
+Once the mud is running, you will be able to connect to it and play around once
+you have decided a handle name for yourself. Currently the MUD requires no passwords
+to connect, and all commands are available to all users.
+
+The MUD's Perl modules
+======================
+
+The various mud-related modules that constitute Anacronia V4 are located in the
+lib/ subdirectory of this repository.
+
+Their purpose is as follows:
+
+    lib/Av4.pm                  The server. It loads a sample area file, starts
+                                accepting connections, and handles the connections.
+                                Some of the subs and behaviour here should be moved
+                                to Av4::Server, in due time.
+    lib/Av4/Server.pm           The object that identifies the server. It contains
+                                the input and output buffers for the clients, the
+                                parsed help pages, etc.
+    lib/Av4/Telnet.pm           Contains constants used for handling telnet options.
+                                None of the modules on CPAN fulfilled the purpose of
+                                this module precisely.
+    lib/Av4/TelnetOptions.pm    Handles all the supported telnet options for a
+                                connection: MCCP, TTYPE, NAWS, as well as analysing
+                                incoming data and sending data to the connected sockets.
+    lib/Av4/Ansi.pm             Handles the ANSI colorization of MUD strings by the MUD
+                                itself, or as inputed by the players.
+    lib/Av4/Entity.pm           A basic MUD entity all entities inherit from. This handles
+                                a basic command queue for all entities, and can execute
+                                commands.
+    lib/Av4/Entity/Mobile.pm    A mobile (monster) which can execute random commands
+    lib/Av4/Entity/Player.pm    A player, whose ouput is sent rather than discarded.
+                                Any connection made to the MUD gets assigned one of
+                                these objects. This handles the connection's state,
+                                as well as the telnet options associated, etc.
+    lib/Av4/Command.pm          An object which identifies a MUD command, with its
+                                name, queue priority, the amount of ticks it delays
+                                for, the code that should be executed, and manages
+                                its execution.
+    lib/Av4/Commands.pm         A list of all the commands (by category) supported
+                                by the MUD. Here strings which trigger a command are
+                                associated with the code (from other modules) which
+                                executes such command.
+    lib/Av4/Commands/Basic.pm   All the basic commands which every user gets. In this
+                                release any user is able to use the @shutdown command
+                                to shutdown the MUD process or @mpall to force all
+                                entities in a room to execute a command.
+    lib/Av4/Commands/MCP.pm     All the commands that handle the MCP protocol: the
+                                authentication key, the negotiation, and some MCP
+                                extensions. The support for MCP is far from working
+                                reliably, as it needs tested with more clients.
+    lib/Av4/Commands/MXP.pm     Commands to test MXP with clients which support it.
+                                Currently the MUD advertises MXP but doesn't do much.
+    lib/Av4/Commands/Delegated.pm
+                                A test "delegated" command, which uses Gearman to
+                                ask a Gearman worker to execute an action and returns
+                                output to the user once the callback returns with
+                                output. The idea is to use this for long-running and
+                                CPU intensive tasks which the MUD cannot do for
+                                performance reasons (such as finding the shortest path
+                                between two points).
+    lib/Av4/Utils.pm            A get_logger() function that gets the right logger
+                                (Log::Log4perl instance) for a function; the cached
+                                ansify() function which uses Memcached.
+                                It also contains the commonly used %Av4::Utils::ANSI
+                                hash which is used throughout where there is no need
+                                to repeatedly ansify strings.
+    lib/Av4/Help.pm             A "help page" object, with the level, keywords and
+                                the data that actually comprises the help page.
+    lib/Av4/HelpParse.pm        A utility module to parse SMAUG format help files
+    lib/Av4/Area.pm             An "area" object, which contains a number of prototype
+                                rooms and mobiles.
+    lib/Av4/Room.pm             A "room" object, which contains a number of players
+                                and entities, has a description and exits, etc.
+    lib/Av4/AreaParse.pm        A utility module to parse SMAUG format area files
+                                and create the relevant Area and Room objects from it.
+
+Other bits and pieces of information
+====================================
+
+The command queue concept.
+--------------------------
+
+In many MUDs commands are parsed and executed in a first-come first-served fashion, at
+every tick which handles incoming text: if the character is currently performing an
+action which delays (casting a spell for example), any other command (including the ones
+which conceptually shouldn't be delayed such as SCORE) need to wait for the first
+command to be executed, before being executed.
+In other more modern MUDs there may be multiple command queues which allow the player
+to perform delaying actions which don't overlap with each other. As an example, using
+an attack prevents the player from attacking again before N seconds, but meanwhile
+the player is "attack-delayed", they can still ready a defensive command, or see
+their statistics via SCORE.
+Anacronia V4 implements a queue system in which all the user's input is bunched into
+a queue of commands, and commands are executed in order of priority. Adding
+specific queue types (attack, defense, movement) is on the roadmap and should be
+fairly easy to implement.
+
+The process through which the queue system works is found on lib/Av4/Entity.pm and
+in lib/Av4/Entity/Player.pm. There are some tests for it in t/001-av4-queues.t.
+
+The datalogs, under datalogs/
+-----------------------------
+
+Since the MUD supports a number of telnet and MUD-specific protocols, I've gathered
+log dumps of the input/output of a number of MUD clients which connected to the
+MUD a number of times. These can be found in the datalogs/ directory. They are
+included for reference, and will/should be used to construct tests or debug non
+working features. Some tools to massage these datalogs are found under scripts/.
+
+The benchmarks
+--------------
+
+Using Devel::NYTProf several slow subroutines were found and sped up. For example,
+the ansify() subroutine used to take most of the CPU time for the MUD. Since then,
+the subroutine has been rewritten in Inline::C. A benchmark file has been added to
+benchmarks/ to allow users to repeat the benchmark and decide for themselves if
+they want to use the Inline::C version or substitute the much slower pure Perl one.
+
+The directory also contains some excerpts of older Devel::NYTProf runs on the MUD
+executable, just in case these details need to be referenced or compared in the
+future.
+
+The lib/Av4.pm file can sense if it's running under Devel::NYTProf, and enable and
+disable debugging before and after running the "main loop". This reduces the code
+being profiled to the part that makes more sense (running the mud) rather than the
+part which doesn't (the startup and shutdown, which only happen once).
+
+To invoke the MUD under Devel::NYTProf, asking it to not start straightaway, use:
+
+    $ NYTPROF=start=no perl -d:NYTProf ./mud
+    [...]
+    $ nytprofhtml -d          # or with --minimal for only "lines" output
+
+The scripts
+-----------
+
+There are some scripts which have been used during the development at one time or
+the other.
+
+Fuzzier:
+
+The most used is scripts/fuzzier.pl which allows a number of clients to connect
+to the MUD and start sending a number of commands, fast. This is used to
+benchmark various parts of the MUD and see which areas are slow or need some
+improvement.
+The fuzzier is usually started using the scripts/launch-fuzzier helper, which
+launches four fuzziers in the background, with 250 clients each.
+
+Chart plotter:
+
+scripts/plot-ticks.pl allows you to plot some statistics about the MUD, namely
+the amount of clients connected and the time it took to perform the 'commands'
+and 'flush' ticks, throughout the mud's uptime. The script needs Chart::Clicker,
+and relies on the MUD creating the various *.csv files containing the information
+for each tick.
+
+The simple telnet server:
+
+The program "mudanyevent" can be used for testing whether it's Av4 that is
+handling things erroneously or if it's anything to do with a general "telnet
+server" problem, or an AnyEvent limitation or what-have-you. As of the last
+invocation, "mudanyevent" handled ~1000 concurrent connections, launched via:
+
+    $ scripts/launch-fuzzier 10 --clients 99 --waitdelay0 0 --idlecmds 0.05
+
+There is something that pegs the "mudanyevent" (and Av4) when >1000 connections
+are made: the CPU goes to 100% and the SIGTERM handler isn't invoked.
+With ~800+ connections, the last connections take ages to get connected, and may
+even just flat out time out and never connect for >~950.
+
+AnyEvent can be quite performant, as the "mudanyevent" stats for the above fuzzier
+run displayed on my last run (whitespace munged):
+
+    Received 695472    bytes - 9937.407    bytes/sec
+    Sent     216840410 bytes - 3098372.483 bytes/sec - 3025.754 KiB/sec - 2.955 MiB/sec
+    Total run time: 69.985262 seconds
+    Handled 60258 commands in 69.985262 seconds: 861.010 commands/second
+
+The tests
+---------
+
+The t/ directory contains a number of tests for some of the features of the MUD.
+Not all features are tested. If you do want to write a small test file or contribute
+a test case you're more than welcome to do so. Meanwhile, the test files that
+are provided exercise the ANSIfication of strings and the inner workings of the
+priority queue, two widely used features of the MUD.
+Both achieve quite high branch coverage in the subroutines they call. The aim is
+for all areas of the MUD code to be exercised, and achieve and maintain a high level
+of branch coverage.
+
