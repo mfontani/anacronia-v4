@@ -23,7 +23,7 @@ Prerequisites
 =============
 
 In order to start the MUD, you'll need the following Perl modules installed.
-You will also need a working C compiler, as the program uses Inline::C.
+You will also need a working C compiler, as the program uses XS code.
 You may want to use App::cpanminus to install these, as that allows you to
 have them installed in your $HOME rather than system wide.
 Patches to create a local::lib with the prerequisite modules installed under
@@ -37,9 +37,9 @@ inc/ are welcome.
     AnyEvent::Handle                Handles server/clients
     AnyEvent::Socket                Handles low-level sockets asynchronously
     Cache::Memcached::Fast          To cache ansified help pages, and soon more
+    XSLoader                        To load the XS code used by the ansifier
     Class::XSAccessor               Used to generate r/w getters/setters
     Compress::Raw::Zlib             Used for MCCP (compression) support
-    Inline::C                       Allows very performant C routines to be called
     Log::Log4perl                   For debugging and logging purposes
     Time::HiRes                     Very precise timings and time differences
     YAML                            Debugging and dumping data structures
@@ -59,6 +59,11 @@ You may install the prerequisite modules by issuing commands similar to the foll
 
 A Build.PL file is also included, and it may (or may not) help you installing
 the right prerequisites, too.
+
+In order for the XS code to be built, at least the following must be ran:
+
+    $ perl Build.PL
+    $ ./Build
 
 Launching the MUD
 =================
@@ -191,11 +196,12 @@ working features. Some tools to massage these datalogs are found under scripts/.
 The benchmarks
 --------------
 
-Using Devel::NYTProf several slow subroutines were found and sped up. For example,
-the ansify() subroutine used to take most of the CPU time for the MUD. Since then,
-the subroutine has been rewritten in Inline::C. A benchmark file has been added to
-benchmarks/ to allow users to repeat the benchmark and decide for themselves if
-they want to use the Inline::C version or substitute the much slower pure Perl one.
+Using Devel::NYTProf several slow subroutines were found and sped up. For
+example, the ansify() subroutine used to take most of the CPU time for the MUD.
+Since then, the subroutine has been rewritten in XS. A benchmark file has been
+added to benchmarks/ to allow users to repeat the benchmark and decide for
+themselves if they want to use the XS version or substitute the much slower
+pure Perl one.
 
 The directory also contains some excerpts of older Devel::NYTProf runs on the MUD
 executable, just in case these details need to be referenced or compared in the

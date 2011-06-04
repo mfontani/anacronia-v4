@@ -1,12 +1,14 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
+use lib 'lib';
+use Av4::Ansi;
 use Benchmark qw/:all/;
 
 use Inline C  => <<'END_INLINE_C';
     unsigned char __colors[8] = "xrgybpcw";
     // Canonical, used in the mud
-    unsigned char getcolor(unsigned char clrchar) {
+    unsigned char inline_getcolor(unsigned char clrchar) {
         char i = 0;
         for ( i = 0; i < 8; i++ ) {
             if (   clrchar     == __colors[i] ) { return i; }
@@ -94,8 +96,12 @@ END_INLINE_C
 
 ### Give each possibility to cache stuff
 for (qw/x r g y b p c w ~/) {
-    my $lc = getcolor(ord $_);
-    my $uc = getcolor(ord uc $_);
+    my $lc = inline_getcolor( ord $_ );    # local Inline::C version
+    my $uc = inline_getcolor(ord uc $_);
+    Av4::Ansi::getcolor(ord $_) == $lc
+        or die "Av4::Ansi::getcolor( ord $_ ) returns wrong value";
+    Av4::Ansi::getcolor(ord uc $_) == $uc
+        or die "Av4::Ansi::getcolor( ord uc $_ ) returns wrong value";
     opt_getcolor(ord $_) == $lc
         or die "opt_getcolor( ord $_ ) returns wrong value";
     opt_getcolor(ord uc $_) == $uc
@@ -132,10 +138,18 @@ my $result = timethese(
         },
         'Inline::C' => sub {
             for (qw/x r g y b p c w ~/) {
-                getcolor(ord $_)
+                inline_getcolor(ord $_)
             }
             for (qw/X R G Y B P C W ~/) {
-                getcolor(ord $_)
+                inline_getcolor(ord $_)
+            }
+        },
+        'Av4::Ansi XS' => sub {
+            for (qw/x r g y b p c w ~/) {
+                Av4::Ansi::getcolor(ord $_)
+            }
+            for (qw/X R G Y B P C W ~/) {
+                Av4::Ansi::getcolor(ord $_)
             }
         },
         'Pure Perl' => sub {

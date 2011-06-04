@@ -2,17 +2,10 @@ package Av4::Ansi;
 use strict;
 use warnings;
 
-use Inline C => <<'END_INLINE_C';
-    unsigned char __colors[8] = "xrgybpcw";
-    unsigned char getcolor(unsigned char clrchar) {
-        char i = 0;
-        for ( i = 0; i < 8; i++ ) {
-            if (   clrchar     == __colors[i] ) { return i; }
-            if ( ( clrchar+32) == __colors[i] ) { return i; }
-        }
-        return (unsigned char) -1;
-    }
-END_INLINE_C
+use XSLoader;
+our $VERSION = '0.01';
+
+XSLoader::load('Av4::Ansi', $VERSION);
 
 our ( $amp, $car, $bang ) = ( ord('&'), ord('^'), ord('!') );
 
