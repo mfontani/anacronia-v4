@@ -72,10 +72,10 @@ sub broadcast {
             if ($selfmessage) {
                 $player->print($selfmessage);
             }
-            next;
+        } else {
+            $player->print($message);
+            $player->prompt;
         }
-        $player->print($message);
-        $player->prompt;
     }
 }
 
