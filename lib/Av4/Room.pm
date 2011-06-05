@@ -66,8 +66,9 @@ sub by_id {
 
 sub broadcast {
     my ( $self, $actor, $message, $selfmessage ) = @_;
+    my $actor_id = $actor->id;
     for my $player ( @{ $self->entities } ) {
-        if ( $player->id eq $actor->id ) {
+        if ( $player->id eq $actor_id ) {
             if ($selfmessage) {
                 $player->print($selfmessage);
             }
