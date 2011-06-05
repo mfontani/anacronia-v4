@@ -67,7 +67,7 @@ GetOptions(
 pod2usage(1) if $show_help;
 pod2usage( -exitstatus => 0, -verbose => 2 ) if $show_man;
 
-die "Don't even try running this on a port <= 1024!\n" if $port && $port <= 1024;
+die "Don't even try running this on a port <= 1024!\n" if $port && ($address && $address ne 'unix/') && $port <= 1024;
 
 my $av4 = Av4->new(
     ( $address       ? ( listen_address => $address )       : () ),
