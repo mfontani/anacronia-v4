@@ -323,7 +323,7 @@ sub run {
                 }
             }
             warn sprintf(
-                "  Command %-10s took min %.6f max %.6f median %.6f min size %s max size %s median size %s\n",
+                "  Command %-10s took min %.6f max %.6f median %.6f min size %-8s max size %-8s median size %s\n",
                 $command, $min, $max, $total / $n_commands,
                 $min_size, $max_size, $total_size / $n_commands
             );
