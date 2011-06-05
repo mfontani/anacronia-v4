@@ -47,10 +47,11 @@ sub cmd_say {
     if ( !$room ) {
         return [ 0, "You are not in a room!\r\n" ];
     }
+    my $ansified = ansify("&W$argstr");
     $room->broadcast(
         $user,
-        $Av4::Utils::ANSI{'&w'} . $user->name . " says: " . ansify("&W$argstr") . "\n\r",
-        $Av4::Utils::ANSI{'&w'} . "You say: " . ansify("&W$argstr") . "\n\r",
+        $Av4::Utils::ANSI{'&w'} . $user->name . " says: $ansified\r\n",
+        $Av4::Utils::ANSI{'&w'} . "You say: $ansified\r\n",
     );
     return [0];
 }
