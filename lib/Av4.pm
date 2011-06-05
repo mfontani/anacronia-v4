@@ -100,7 +100,7 @@ our $gearman = AnyEvent::Gearman::Client->new( job_servers => ['127.0.0.1'], );
 
 # This condvar is used to terminate the MUD. When anything sends it anything,
 # the MUD terminates and will display statistics about its execution.
-our $quit_program = AnyEvent->condvar;
+our $quit_program = AE::cv;
 
 # Creates a new object, mainly setting undefined variables to their correct
 # defaults and configuring log4perl if the "fake" option is given.
@@ -158,39 +158,18 @@ sub run {
       . sprintf( "%c%c%c", TELOPT_IAC, TELOPT_WILL, TELOPT_MXP )
       . '#$#mcp version: 2.1 to: 2.1' . "\r\n"
       . $banner;
-    my $w = AnyEvent->signal(
-        signal => "INT",
-        cb     => sub {
-            $quit_program->send('SIGINT');
-        }
-    );
+    my $w = AE::signal( 'INT', sub { $quit_program->send('SIGINT') } );
 
-    my $tick_buffers_flush = AnyEvent->timer(
-        after    => 1.0,
-        interval => $sec_tick_flush,
-        cb       => \&tick_flush,
-    );
+    my $tick_buffers_flush = AE::timer( 1.0, $sec_tick_flush, \&tick_flush );
     warn "Tick flush called every $sec_tick_flush\n";
 
-    my $tick_players = AnyEvent->timer(
-        after    => 1.0,
-        interval => $sec_tick_players,
-        cb       => \&tick_players,
-    );
+    my $tick_players = AE::timer( 1.0, $sec_tick_players, \&tick_players );
     warn "Tick players called every $sec_tick_players\n";
 
-    my $tick_commands = AnyEvent->timer(
-        after    => 1.0,
-        interval => $sec_tick_commands,
-        cb       => \&tick_commands,
-    );
+    my $tick_commands = AE::timer( 1.0, $sec_tick_commands, \&tick_commands );
     warn "Tick commands removes $sec_tick_commands each run\n";
 
-    my $tick_mobiles = AnyEvent->timer(
-        after    => 1.0,
-        interval => $sec_tick_mobiles,
-        cb       => \&tick_mobiles,
-    );
+    my $tick_mobiles = AE::timer( 1.0, $sec_tick_mobiles, \&tick_mobiles );
     $mud_start = [gettimeofday];
 
     # Load mobs from areas' resets
