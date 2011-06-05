@@ -191,6 +191,10 @@ sub rand_command {
     if ( $ret eq 'look' ) {
         return $ret;
     }
+    if ( $ret eq 'who' ) { # WHO <arg> or just WHO
+        return $ret . ' ' . chr(ord('a') + int(rand(20))) if ( rand(1) );
+        return $ret;
+    }
     $ret .= ' ';
     $ret .= $helps[ rand @helps ];
     return $ret;
