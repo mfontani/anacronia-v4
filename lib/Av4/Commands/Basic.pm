@@ -251,28 +251,28 @@ sub cmd_hlist {
     ];
 }
 
+our $areas_list;
 sub cmd_areas {
     my ( $client, $user, $argstr ) = @_;
-    return [
-        0,
-        "$Av4::Utils::ANSI{'&c'}Areas$Av4::Utils::ANSI{'&w'}:\n" . join(
-            '',
-            map {
-                sprintf(
-                    "%4d %-25s %-30s (%d rooms: %s)\n",
-                    $_->id, $_->filename, $_->name,
-                    scalar @{ $_->rooms },
-                    join( ', ', map { $_->vnum } @{ $_->rooms } )
-                  )
-              }
-              sort { $a->id <=> $b->id } @{ $user->server->areas }
-          )
-          . $Av4::Utils::ANSI{"&c"}
-          . scalar @{ $user->server->areas }
-          . ' areas found.'
-          . $Av4::Utils::ANSI{'&^'},
-        ".\n"
-    ];
+    return [ 0, $areas_list ] if defined $areas_list;
+    $areas_list = "$Av4::Utils::ANSI{'&c'}Areas$Av4::Utils::ANSI{'&w'}:\n" . join(
+        '',
+        map {
+            sprintf(
+                "%4d %-25s %-30s (%d rooms: %s)\n",
+                $_->id, $_->filename, $_->name,
+                scalar @{ $_->rooms },
+                join( ', ', map { $_->vnum } @{ $_->rooms } )
+              )
+          }
+          sort { $a->id <=> $b->id } @{ $user->server->areas }
+      )
+      . $Av4::Utils::ANSI{"&c"}
+      . scalar @{ $user->server->areas }
+      . ' areas found.'
+      . $Av4::Utils::ANSI{'&^'},
+      ".\n";
+    return [ 0, $areas_list ];
 }
 
 sub cmd_stats {
