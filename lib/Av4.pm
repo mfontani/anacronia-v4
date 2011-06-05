@@ -95,6 +95,9 @@ our $mud_welcome_banner = "Hello\r\n";
 # The mud server -- in a way, a singleton although not really one..
 our $server = undef;
 
+# To speed up lookups, $users_by_handle{ anyevent handle } = $user;
+our %users_by_handle;
+
 # Used by "delegated" commands (so far, only a test)
 our $gearman = AnyEvent::Gearman::Client->new( job_servers => ['127.0.0.1'], );
 
@@ -360,6 +363,7 @@ sub server_accept_cb {
         mcp_authentication_key => '',
         commands_dispatched    => [],
     );
+    $users_by_handle{ $handle } = $new_user;
     $new_user->telopts( Av4::TelnetOptions->new( user => $new_user ) );
     push @{ $server->clients },  $new_user;
     push @{ $server->entities }, $new_user;
@@ -381,13 +385,14 @@ sub server_accept_cb {
 sub client_read {
     my $data = $_[0]->rbuf;
     $_[0]->rbuf = '';
-    my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
-    die "Cant find user $_[0] in clients!" if ( !defined $user );
+    my $user = $users_by_handle{ $_[0] };
+    die "Cant find user $_[0] in users_by_handle!" if ( !defined $user );
 
     #__data_log( 'Received from', $client, $data );    # ONLY FOR DEBUG!
     eval { $data = $user->received_data($data); };
     if ($@) {
         warn("Quitting client $_[0]: $@\n");
+        delete $users_by_handle{ $_[0] };
         $_[0]->destroy;
         $user->id->destroy;
         $server->clients(  [ grep { defined $_ && $_->id != $_[0] } @{ server->clients } ] );
@@ -407,6 +412,7 @@ sub client_read {
                 1,    # send prompt to others
             );
             warn("Client $_[0] SPAMMING (queue>80) ==> OUT!\n");
+            delete $users_by_handle{ $_[0] };
             $user->queue( ['quit'] );
             $server->inbuffer->{ $_[0] } = '';
             $user->id->destroy;
@@ -422,7 +428,9 @@ sub client_read {
 # This gets called when a client has received an error. The client is purged
 # from the server and the server goes their merry way.
 sub client_error {
-    my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
+    #my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
+    my $user = $users_by_handle{ $_[0] };
+    my $name = $user ? $user->name : $_[0];
     if ($user) {
         $user->queue( [] );
         if ( $user->in_room ) {
@@ -431,30 +439,44 @@ sub client_error {
             $user->remove_from_room();
         }
     }
+    delete $users_by_handle{ $_[0] };
     $server->clients(  [ grep { defined $_ && $_->id != $_[0] } @{ $server->clients } ] );
     $server->entities( [ grep { defined $_ && $_->id != $_[0] } @{ $server->entities } ] );
     $_[0]->destroy();
     $Av4::Commands::Basic::wholist = undef;    # invalidate who list
-    broadcast(
+    $user->broadcast(
         $_[0],
-        "$Av4::Utils::ANSI{'&W'}$_[0] $Av4::Utils::ANSI{'&G'}quits the MUD due to errors $_[2]\n\r",
+        "$Av4::Utils::ANSI{'&W'}$name $Av4::Utils::ANSI{'&G'}quits the MUD due to errors $_[2]\n\r",
         '',
         1,                                     # send prompt to others
     );
-    warn("$_[0] quits due to errors: $_[2]\n");
+    warn("$name ($_[0]) quits due to errors: $_[2]\n");
 }
 
 # This gets called whenever a client quits.
 sub client_quit {
-    broadcast(
+    my $user = $users_by_handle{ $_[0] };
+    my $name = $user ? $user->name : $_[0];
+    if ($user) {
+        $user->queue( [] );
+        if ( $user->in_room ) {
+
+            # Player is no longer in the room
+            $user->remove_from_room();
+        }
+    }
+    delete $users_by_handle{ $_[0] };
+    $server->clients(  [ grep { defined $_ && $_->id != $_[0] } @{ $server->clients } ] );
+    $server->entities( [ grep { defined $_ && $_->id != $_[0] } @{ $server->entities } ] );
+    $_[0]->destroy();
+    $Av4::Commands::Basic::wholist = undef;    # invalidate who list
+    $user->broadcast(
         $_[0],
-        "&W$_[0] &Gquits the MUD\n\r",
+        "$Av4::Utils::ANSI{'&W'}$name $Av4::Utils::ANSI{'&G'}quits the MUD\n\r",
+        '',
         1,                                     # send prompt to others
     );
-    my ($user) = grep { defined $_ && $_->id == $_[0] } @{ $server->clients };
-    $server->clients(  [ grep { $_->id ne $_[0] } @{ $server->clients } ] );
-    $server->entities( [ grep { $_->id ne $_[0] } @{ $server->entities } ] );
-    $user->remove_from_room() if ( $user->in_room );
+    warn("$name ($_[0]) quits the MUD\n");
 }
 
 # Broadcast a message to -all- entities (not "just" clients)
