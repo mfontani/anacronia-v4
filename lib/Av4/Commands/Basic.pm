@@ -84,16 +84,50 @@ sub cmd_colors {
 our $wholist;
 
 # No longer used as it was pushing out 117KiB on 800 connections O_O
+# Now only used if < 20 players, or if the user gave a pattern in $argstr
 sub cmd_long_who {
     my ( $client, $user, $argstr ) = @_;
     $argstr = '' if ( $argstr =~ /^\s*$/ );
-    if ( $user->name ne 'okram' ) {
-        return [ 0, $wholist ] if defined $wholist;
+
+    if ( !$argstr ) {
+        if ( $user->name ne 'okram' ) {
+            return [ 0, $wholist ] if defined $wholist;
+        }
+        my $output = '';
+        $output .= $Av4::Utils::ANSI{'&g'} . '#' x 35 . ' ONLINE ' . '#' x 35 . $Av4::Utils::ANSI{'&^'} . "\r\n";
+        foreach my $plr ( @{ $user->server->clients } ) {
+            next if ( !defined $plr );
+            my $t = $plr->telopts;
+            $output .= sprintf(
+                "%-30s %-20s %s %s %s %s %s%s\r\n",
+                $Av4::Utils::ANSI{'&r'} . $plr,
+                $Av4::Utils::ANSI{'&y'} . $plr->name,
+                $t->mxp                      ? $Av4::Utils::ANSI{'&g'} . 'MXP  ' : $Av4::Utils::ANSI{'&R'} . '!MXP ',
+                $t->mccp                     ? $Av4::Utils::ANSI{'&g'} . 'MCCP ' : $Av4::Utils::ANSI{'&R'} . '!MCCP',
+                $plr->mcp_authentication_key ? $Av4::Utils::ANSI{'&g'} . 'MCP  ' : $Av4::Utils::ANSI{'&R'} . '!MCP ',
+                ( $t->naws_w && $t->naws_h )
+                ? $Av4::Utils::ANSI{'&g'} . sprintf( 'NAWS %dx%d', $t->naws_w, $t->naws_h )
+                : $Av4::Utils::ANSI{'&R'} . '!NAWS',
+                $user->name eq 'okram'    # FIXME -- if $user is admin
+                ? $Av4::Utils::ANSI{'&p'} . sprintf( '%s:%s', $plr->host, $plr->port )
+                : '',
+                $Av4::Utils::ANSI{'&^'},
+            );
+        }
+        $output .= $Av4::Utils::ANSI{'&g'} . sprintf( "%d users total.", scalar @{ $user->server->clients } ) . $Av4::Utils::ANSI{'&^'};
+        $wholist = $output if $user->name ne 'okram';
+        return [ 0, $output ];
     }
+
     my $output = '';
     $output .= $Av4::Utils::ANSI{'&g'} . '#' x 35 . ' ONLINE ' . '#' x 35 . $Av4::Utils::ANSI{'&^'} . "\r\n";
+    $output .= $Av4::Utils::ANSI{'&W'} . '----- Players matching: ' . $Av4::Utils::ANSI{'&Y'} . $argstr . "\r\n";
+
+    # List players whose name matches the $argstr given
+    my $n_shown = 0;
     foreach my $plr ( @{ $user->server->clients } ) {
-        next if ( !defined $plr );
+        next if ( !defined $plr || $plr->name !~ /^\Q$argstr\E/ );
+        $n_shown++;
         my $t = $plr->telopts;
         $output .= sprintf(
             "%-30s %-20s %s %s %s %s %s%s\r\n",
@@ -111,35 +145,37 @@ sub cmd_long_who {
             $Av4::Utils::ANSI{'&^'},
         );
     }
-    $output .= $Av4::Utils::ANSI{'&g'} . sprintf( "%d users total.", scalar @{ $user->server->clients } ) . $Av4::Utils::ANSI{'&^'};
-    $wholist = $output if $user->name ne 'okram';
+
+    $output .= sprintf(
+        "%s%d %susers matched out of %s%d%s users total.%s",
+        $n_shown ? $Av4::Utils::ANSI{'&g'} : $Av4::Utils::ANSI{'&r'},
+        $n_shown, $Av4::Utils::ANSI{'&g'}, $Av4::Utils::ANSI{'&Y'}, scalar @{ $user->server->clients },
+        $Av4::Utils::ANSI{'&g'}, $Av4::Utils::ANSI{'&^'},
+    );
     return [ 0, $output ];
 }
 
 sub cmd_who {
     my ( $client, $user, $argstr ) = @_;
     $argstr = '' if ( $argstr =~ /^\s*$/ );
-    if ( $user->name ne 'okram' ) {
-        return [ 0, $wholist ] if defined $wholist;
-    }
-    my $output = '';
-    $output .= $Av4::Utils::ANSI{'&g'} . '#' x 35 . ' ONLINE ' . '#' x 35 . $Av4::Utils::ANSI{'&^'} . "\r\n";
 
-    #foreach my $plr ( @{ $user->server->clients } ) {
-    #    next if ( !defined $plr );
-    #    my $t = $plr->telopts;
-    #    $output .= sprintf(
-    #        "%-20s %s%s\r\n",
-    #        $Av4::Utils::ANSI{'&y'} . $plr->name,
-    #        $user->name eq 'okram' # FIXME -- if $user is admin
-    #            ? $Av4::Utils::ANSI{'&p'} . sprintf('%s:%s', $plr->host, $plr->port )
-    #            : '',
-    #        $Av4::Utils::ANSI{'&^'},
-    #    );
-    #}
-    $output .= $Av4::Utils::ANSI{'&g'} . sprintf( "%d users total.", scalar @{ $user->server->clients } ) . $Av4::Utils::ANSI{'&^'};
-    $wholist = $output;    # if $user->name ne 'okram';
-    return [ 0, $output ];
+    # We can manage the "long" who if there are a few players or if the user asked for
+    # players matching a pattern.
+    goto \&cmd_long_who if ( scalar @{ $user->server->clients } < 20 || length $argstr );
+
+    # Too many players to do a long who
+    if ( !defined $wholist ) {
+        my $output = '';
+        $output .= $Av4::Utils::ANSI{'&g'} . '#' x 15 . ' ONLINE ' . '#' x 15 . $Av4::Utils::ANSI{'&^'} . "\r\n";
+        $output .= $Av4::Utils::ANSI{'&r'} . "Too many players online to show them all.\r\n";
+        $output .= $Av4::Utils::ANSI{'&W'} . "Use the command: ";
+        $output .= "'$Av4::Utils::ANSI{'&Y'}WHO LETTER$Av4::Utils::ANSI{'&W'}' ";
+        $output .= "to see info for players whose name begins with that letter.\r\n";
+        $output .= $Av4::Utils::ANSI{'&g'} . sprintf( "%d users total.", scalar @{ $user->server->clients } ) . $Av4::Utils::ANSI{'&^'};
+        $wholist = $output;
+    }
+    return [ 0, $wholist ] if defined $wholist;
+
 }
 
 sub cmd_commands {
