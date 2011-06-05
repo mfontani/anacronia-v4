@@ -1,6 +1,7 @@
 package Av4::Help;
 use strict;
 use warnings;
+use Av4::Ansi;
 use Class::XSAccessor {
     constructor => '_new',
     accessors   => [qw/level keywords data data_ansified/],
@@ -8,7 +9,7 @@ use Class::XSAccessor {
 
 sub new {
     my $class = shift;
-    $class->_new(
+    my $ohelp = $class->_new(
 
         # defaults
         level         => 0,
@@ -19,6 +20,10 @@ sub new {
         # wanted options
         @_,
     );
+    if ( !$ohelp->data_ansified ) {
+        $ohelp->data_ansified( Av4::Ansi::ansify( $ohelp->data ) );
+    }
+    return $ohelp;
 }
 
 1;

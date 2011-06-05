@@ -15,6 +15,20 @@ BEGIN {
         require AnyEvent::Impl::EV;
     }
 }
+
+# Ensure the person has ran Build.PL, Build and built the XS stuff
+BEGIN {
+    die "
+
+    Please launch:
+        perl Build.PL
+        ./Build
+
+    before attempting to launch ./mud again.
+
+    \n" if ( !-f 'auto/Av4/Ansi/Ansi.bs' || !-f 'auto/Av4/Ansi/Ansi.bundle' );
+
+}
 use Av4;
 
 # Show the implementation being used, or die if it tries to use the pure-Perl version
@@ -35,7 +49,6 @@ my $tick_commands = 0;
 my $tick_mobiles  = 0;
 my $tick_flush    = 0;
 my $fake          = 0;
-my $helpfile      = '';
 my $areadir       = '';
 my $show_help     = 0;
 my $show_man      = 0;
@@ -49,7 +62,6 @@ GetOptions(
     'tick_commands=s' => \$tick_commands,
     'tick_mobiles=s'  => \$tick_mobiles,
     'tick_flush=s'    => \$tick_flush,
-    'helpfile=s'      => \$helpfile,
     'areadir=s'       => \$areadir,
 ) or pod2usage(2);
 pod2usage(1) if $show_help;
@@ -64,7 +76,6 @@ my $av4 = Av4->new(
     ( $tick_commands ? ( tick_commands  => $tick_commands ) : () ),
     ( $tick_mobiles  ? ( tick_mobiles   => $tick_mobiles )  : () ),
     ( $tick_flush    ? ( tick_flush     => $tick_flush )    : () ),
-    ( $helpfile      ? ( helpfile       => $helpfile )      : () ),
     ( $areadir       ? ( areadir        => $areadir )       : () ),
 );
 $av4->run;
@@ -118,24 +129,20 @@ Sets how often mobiles perform random actions (defaults to whatever is in Av4).
 
 Sets how often clients' buffers are flushed (defaults to whatever is in Av4).
 
-=item B<-helpfile> filename.are
-
-Sets the filename (help.are from smaug format) which should be parsed in order to
-make help pages available to clients. Defaults to help.are in the developer's
-home directory.
-
 =item B<-areadir> areas/
 
-Sets the directory which contains area files (in smaug format, kind of) which
-should be used to load areas from. Defaults to C<areas/>.
+Sets the directory which contains area files (in JSON format) which should be
+used to load areas from. Defaults to C<areas/>.
 
 =back
 
 =head1 DESCRIPTION
 
 B<This program> launches a daemon running on the port specified, which acccepts
-connections and replies to the commands the clients give it. A C<help.are> file
-is parsed for help pages, and the help pages are made available to the clients
-through the C<help> and C<hlist> in-game commands.
+connections and replies to the commands the clients give it. The C<areas/>
+directory (or the one referenced with the C<-areadir> option) is scanned for
+help and area files, and the help pages contained are made available to the
+clients through the C<help> and C<hlist> in-game commands.  Rooms and mobiles
+are also parsed and made available, as well as some types of resets.
 
 =cut

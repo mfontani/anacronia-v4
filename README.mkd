@@ -36,6 +36,7 @@ inc/ are welcome.
     AnyEvent::Gearman::Client       Cmds involving delegating commands to workers
     AnyEvent::Handle                Handles server/clients
     AnyEvent::Socket                Handles low-level sockets asynchronously
+    JSON::XS                        To parse the area and help files
     Cache::Memcached::Fast          To cache ansified help pages, and soon more
     XSLoader                        To load the XS code used by the ansifier
     Class::XSAccessor               Used to generate r/w getters/setters
@@ -95,9 +96,9 @@ lib/ subdirectory of this repository.
 
 Their purpose is as follows:
 
-    lib/Av4.pm                  The server. It loads a sample area file, starts
-                                accepting connections, and handles the connections.
-                                Some of the subs and behaviour here should be moved
+    lib/Av4.pm                  The server. It loads the area files, accepting
+                                connections, and handles the connections. Some
+                                of the subs and behaviour here should be moved
                                 to Av4::Server, in due time.
     lib/Av4/Server.pm           The object that identifies the server. It contains
                                 the input and output buffers for the clients, the
@@ -152,13 +153,12 @@ Their purpose is as follows:
                                 to repeatedly ansify strings.
     lib/Av4/Help.pm             A "help page" object, with the level, keywords and
                                 the data that actually comprises the help page.
-    lib/Av4/HelpParse.pm        A utility module to parse SMAUG format help files
     lib/Av4/Area.pm             An "area" object, which contains a number of prototype
                                 rooms and mobiles.
     lib/Av4/Room.pm             A "room" object, which contains a number of players
                                 and entities, has a description and exits, etc.
-    lib/Av4/AreaParse.pm        A utility module to parse SMAUG format area files
-                                and create the relevant Area and Room objects from it.
+    lib/Av4/AreaParse.pm        A utility module to parse area files and create the
+                                relevant Area, Room, Help and other objects from it.
 
 Other bits and pieces of information
 ====================================
@@ -240,6 +240,12 @@ the amount of clients connected and the time it took to perform the 'commands'
 and 'flush' ticks, throughout the mud's uptime. The script needs Chart::Clicker,
 and relies on the MUD creating the various *.csv files containing the information
 for each tick.
+
+The SMAUG area parser:
+
+scripts/smaug-area-parser allows you to parse (some parts of) a SMAUG area file
+and convert it into a JSON format that can be used by Av4. Not all functions
+are working or implemented, but the most important parts are.
 
 The simple telnet server:
 

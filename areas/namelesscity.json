@@ -1,0 +1,179 @@
+{
+   "rooms" : [
+      {
+         "vnum" : "30",
+         "flags" : [
+            "0"
+         ],
+         "exits" : [
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "31",
+                  "0"
+               ],
+               "desc" : "You see city lights\n",
+               "door" : "0",
+               "to_vnum" : "31",
+               "key" : "0",
+               "locks" : "0"
+            },
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "33",
+                  "0"
+               ],
+               "desc" : "You see city lights\n",
+               "door" : "1",
+               "to_vnum" : "33",
+               "key" : "0",
+               "locks" : "0"
+            },
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "34",
+                  "0"
+               ],
+               "desc" : "You see city lights\n",
+               "door" : "2",
+               "to_vnum" : "34",
+               "key" : "0",
+               "locks" : "0"
+            },
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "32",
+                  "0"
+               ],
+               "desc" : "You see city lights\n",
+               "door" : "3",
+               "to_vnum" : "32",
+               "key" : "0",
+               "locks" : "0"
+            }
+         ],
+         "desc" : "The plaza has stuff in it.\n",
+         "name" : "The centre plaza"
+      },
+      {
+         "vnum" : "31",
+         "flags" : [
+            "0"
+         ],
+         "exits" : [
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "30",
+                  "0"
+               ],
+               "desc" : "You see city lights\n",
+               "door" : "2",
+               "to_vnum" : "30",
+               "key" : "0",
+               "locks" : "0"
+            }
+         ],
+         "desc" : "You see some things.\n",
+         "name" : "North of the plaza"
+      },
+      {
+         "vnum" : "32",
+         "flags" : [
+            "0"
+         ],
+         "exits" : [
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "30",
+                  "0"
+               ],
+               "desc" : "You see city lights\n",
+               "door" : "1",
+               "to_vnum" : "30",
+               "key" : "0",
+               "locks" : "0"
+            }
+         ],
+         "desc" : "You see some things.\n",
+         "name" : "West of the plaza"
+      },
+      {
+         "vnum" : "33",
+         "flags" : [
+            "0"
+         ],
+         "exits" : [
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "30",
+                  "0"
+               ],
+               "desc" : "You see city lights\n",
+               "door" : "3",
+               "to_vnum" : "30",
+               "key" : "0",
+               "locks" : "0"
+            }
+         ],
+         "desc" : "You see some things.\n",
+         "name" : "East of the plaza"
+      },
+      {
+         "vnum" : "34",
+         "flags" : [
+            "0"
+         ],
+         "exits" : [
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "30",
+                  "0"
+               ],
+               "desc" : "You see city lights\n",
+               "door" : "0",
+               "to_vnum" : "30",
+               "key" : "0",
+               "locks" : "0"
+            }
+         ],
+         "desc" : "You see some things.\n",
+         "name" : "South of the plaza"
+      }
+   ],
+   "flags" : [
+      "0"
+   ],
+   "name" : "A nameless city",
+   "author" : "Marco Fontani",
+   "economy" : [
+      "0",
+      "1000000"
+   ],
+   "ranges" : [
+      "0",
+      "1000"
+   ]
+}

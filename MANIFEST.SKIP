@@ -1,0 +1,9 @@
+.git
+.gitignore
+_build
+blib
+Build
+MYMETA.*
+lib/Av4/Ansi.c
+lib/Av4/Ansi.o
+MANIFEST.bak

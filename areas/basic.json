@@ -1,0 +1,131 @@
+{
+   "rooms" : [
+      {
+         "vnum" : "1",
+         "flags" : [
+            "0"
+         ],
+         "desc" : "You feel like you are floating in nothing.\n",
+         "name" : "The void"
+      },
+      {
+         "vnum" : "2",
+         "flags" : [
+            "0"
+         ],
+         "exits" : [
+            {
+               "keywords" : [],
+               "flags" : [
+                  "0",
+                  "0",
+                  "30",
+                  "0"
+               ],
+               "desc" : "You are in limbo, floating in nothing.\nTowards the real world...\n",
+               "door" : "5",
+               "to_vnum" : "30",
+               "key" : "0",
+               "locks" : "0"
+            }
+         ],
+         "desc" : "You are in limbo, floating in nothing.\n",
+         "name" : "The limbo"
+      },
+      {
+         "vnum" : "666",
+         "flags" : [
+            "0"
+         ],
+         "desc" : "You really must've pissed off whoever sent you to hell!!\n",
+         "name" : "Hell"
+      }
+   ],
+   "flags" : [
+      "0"
+   ],
+   "name" : "Game Basic Rooms",
+   "author" : "Marco Fontani",
+   "economy" : [
+      "0",
+      "1000000"
+   ],
+   "ranges" : [
+      "0",
+      "1000"
+   ],
+   "helps" : [
+      {
+         "keywords" : [
+            "__WELCOME__SCREEN__"
+         ],
+         "level" : "0",
+         "text" : "\u001b[0;1;30;90mAnacroniA v4 - A Perl MUD - http://github.com/mfontani/anacronia-v4\u001b[0;37m\n\u001b[0;1;30;90mCopyright (c) 2009, 2010 Marco Fontani - Relased under GNU GPL v3\u001b[0;37m\n\n \u001b[0;1;34mWe\u001b[0;34mlco\u001b[0;37mme \u001b[0;1;30;90mto \u001b[0;1;34m.\u001b[0;34m.\u001b[0;37m.\n \u001b[0;1;34;94m_______\u001b[0m \u001b[0;1;34;94m__\u001b[0m   \u001b[0;1;34;94m_\u001b[0m \u001b[0;34m_______\u001b[0m \u001b[0;34m_______\u001b[0m  \u001b[0;37m______\u001b[0m  \u001b[0;37m_____\u001b[0m  \u001b[0;1;30;90m__\u001b[0m   \u001b[0;1;30;90m_\u001b[0m \u001b[0;1;30;90m___\u001b[0m \u001b[0;1;30;90m___\u001b[0;1;34;94m____\u001b[0m\n \u001b[0;1;34;94m|_____|\u001b[0m \u001b[0;34m|\u001b[0m \u001b[0;34m\\\u001b[0m  \u001b[0;34m|\u001b[0m \u001b[0;34m|_____|\u001b[0m \u001b[0;37m|\u001b[0m       \u001b[0;37m|_____/\u001b[0m \u001b[0;1;30;90m|\u001b[0m     \u001b[0;1;30;90m|\u001b[0m \u001b[0;1;30;90m|\u001b[0m \u001b[0;1;30;90m\\\u001b[0m  \u001b[0;1;30;90m|\u001b[0m  \u001b[0;1;34;94m|\u001b[0m  \u001b[0;1;34;94m|_____|\u001b[0m      \u001b[0;34m|___|\u001b[0m\n \u001b[0;34m|\u001b[0m     \u001b[0;34m|\u001b[0m \u001b[0;34m|\u001b[0m  \u001b[0;34m\\_|\u001b[0m \u001b[0;37m|\u001b[0m     \u001b[0;37m|\u001b[0m \u001b[0;37m|_____\u001b[0m  \u001b[0;1;30;90m|\u001b[0m    \u001b[0;1;30;90m\\_\u001b[0m \u001b[0;1;30;90m|_____|\u001b[0m \u001b[0;1;34;94m|\u001b[0m  \u001b[0;1;34;94m\\_|\u001b[0m \u001b[0;1;34;94m_|_\u001b[0m \u001b[0;1;34;94m|\u001b[0m     \u001b[0;34m|\u001b[0m   \u001b[0;34m\\/\u001b[0m.    |\n\n"
+      },
+      {
+         "keywords" : [
+            "ANACRONIA",
+            "V4"
+         ],
+         "level" : "0",
+         "text" : "&WAnacronia V4&^ is the fourth rewrite of a Multi User Dungeon (MUD), a\nmulti-user internet gaming system. It is written in the Perl programming\nlanguage, and uses \"modern\" technologies and modules, such as AnyEvent,\nGearman, and Memcache.\n\nAnacronia v4 - Copyright (c) 2009-2011 Marco Fontani - MFONTANI at CPAN dot ORG\nReleased under the GPL v.3.0 license\n"
+      },
+      {
+         "keywords" : [
+            "HELP",
+            "HLIST"
+         ],
+         "level" : "0",
+         "text" : "To use the help facility, type: &Yhelp &R<keyword>&^\n    For example, \"&Yhelp anacronia&^\".\nFor a (long) list of help topics, type: &Yhlist <free text>&^\n    For example, \"&Yhlist mud&^\".\n\nYou can use &Yhlist&^ to narrow down the list of pages to the ones which contain\nthe text you specify. For example, \"&Yhlist v4&^\" would show the help pages whose\nkeywords contain that word.\n"
+      },
+      {
+         "keywords" : [
+            "COMMANDS",
+            "COMMAND",
+            "QUEUE",
+            "QUEUES"
+         ],
+         "level" : "0",
+         "text" : "In many MUDs commands are parsed and executed in a first-come first-served\nfashion: if the character is currently performing an action which delays\n(casting a spell for example), any other command (including non-delaying ones\nsuch as &YSCORE&^) need to wait for the first command to be executed.\n\nIn other mode modern MUDs there may be multiple command queues which allow the\nplayer to perform delaying actions which don't overlap with each other. For\nexample, using an attack prevents the player from attacking again before N\nseconds, but meanwhile the player can still ready a defensive command or see\ntheir statistics.\n\nAnacronia V4 implements a queue system in which all the unknown commands are\nweeded out of the command queue, and commands are executed in order of\npriority. Adding specific queue types (attack, defense, movement) is on the\nroadmap and should be fairly easy to implement.\n\nThere is not yet a command which lists all available commands.\n\nThe command \"&YCOMMANDS&^\" allows one to see which commands are currently in\ntheir queue, ready to be executed whenever a player's delay allows it.\n"
+      },
+      {
+         "keywords" : [
+            "SHOUT"
+         ],
+         "level" : "0",
+         "text" : "When you &Yshout phrase&^ the &Yphrase&^ will be shown to all the users currently\nconnected to the game.\n\nThe &Yphrase&^ can contain coloured text (see the command &Ycolors&^).\n\nThis command delays.\n"
+      },
+      {
+         "keywords" : [
+            "COLORS",
+            "COLOURS"
+         ],
+         "level" : "0",
+         "text" : "You can use the &Ycolors&^ command to show the various characters which can be\ncombined in order to shout or display ANSI coloured strings.\n\nThe command will also show you 255 ANSI colours and shades of grey, so you can\ndetermine whether your terminal supports them.\n"
+      },
+      {
+         "keywords" : [
+            "WHO",
+            "ONLINE"
+         ],
+         "level" : "0",
+         "text" : "The &YWHO&^ command displays a list of all the currently connected users.\n\nFor each, it will display whether their client supports any of the MUD-recognised\nextensions (MCCP, etc).\n\nAdmins are able to see the IP and port of each connection.\n"
+      },
+      {
+         "keywords" : [
+            "STATS",
+            "STATISTICS"
+         ],
+         "level" : "0",
+         "text" : "The &YSTATS&^ command displays statistics about your connection.\n\nIt will show you what the MUD recognises as being your terminal's width/height, as\nwell as which of the MUD-recognised extensions (MCCP, MXP, etc) your client seems\nto be supporting, and whether they are enabled.\n\nAdditionally, the command shows some server statistics, such as the number of\ncharacters and data bytes sent to the connections, and the resulting current MCCP2\ncompression ratio.\n"
+      },
+      {
+         "keywords" : [
+            "@SHUTDOWN",
+            "SHUTDOWN"
+         ],
+         "level" : "0",
+         "text" : "The administrative command &Y@SHUTDOWN&^ allows an admin to shutdown the MUD.\n\nThe service will not be restarted, and the executable will show some statistics about\nthe connections and the data transferred during the time the MUD was running.\n"
+      }
+   ]
+}

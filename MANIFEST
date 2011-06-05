@@ -1,11 +1,10 @@
-areas/basic.are
-areas/namelesscity.are
+areas/basic.json
+areas/namelesscity.json
 auto
 benchmarks/ansi-inline-vs-perl.pl
 benchmarks/av4-filter-v-telnet-options--nonmoose.pl
 benchmarks/av4-filter-v-telnet-options.pl
 benchmarks/poll-vs-epoll.txt
-Build.PL
 datalogs/cmud-datalog-weird.txt
 datalogs/cmud-datalog.txt
 datalogs/gnoemoe-datalog.txt
@@ -26,7 +25,6 @@ datalogs/zmud-721-reconnected.txt
 docs/mcp-clients.txt
 docs/mcp-support-clients.ods
 EXTENSIONS.mkd
-help.are
 lib/Av4.pm
 lib/Av4/Ansi.pm
 lib/Av4/Ansi.xs
@@ -42,7 +40,6 @@ lib/Av4/Entity.pm
 lib/Av4/Entity/Mobile.pm
 lib/Av4/Entity/Player.pm
 lib/Av4/Help.pm
-lib/Av4/HelpParse.pm
 lib/Av4/Room.pm
 lib/Av4/Server.pm
 lib/Av4/Telnet.pm
@@ -50,16 +47,18 @@ lib/Av4/TelnetOptions.pm
 lib/Av4/Utils.pm
 LICENSE
 log.conf
+Makefile
 MANIFEST			This list of files
+MANIFEST.SKIP
 mud
 mudanyevent
 README.mkd
 scripts/analyze-data.pl
 scripts/ansitest.pl
-scripts/areaparse.pl
 scripts/fuzzier.pl
 scripts/launch-fuzzier
 scripts/plot-ticks.pl
+scripts/smaug-area-parser
 scripts/tidyup.pl
 scripts/worker-getpowerhtml.pl
 t/000-av4-ansi.t

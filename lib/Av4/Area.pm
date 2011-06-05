@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Class::XSAccessor {
     constructor => '_new',
-    accessors   => [qw/id name author ranges resetmsg flags economy rooms mobiles/],
+    accessors   => [qw/filename id name author ranges resetmsg flags economy rooms mobiles/],
 };
 
 our %areas;
@@ -15,6 +15,7 @@ sub new {
     my $area  = $class->_new(
 
         # defaults
+        filename => '',
         name     => 'Unnamed area',
         author   => 'Nobody',
         ranges   => [ 0, 0 ],

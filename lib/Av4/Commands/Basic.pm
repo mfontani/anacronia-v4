@@ -1,6 +1,6 @@
 package Av4::Commands::Basic;
 require Av4;
-require Av4::HelpParse;
+require Av4::AreaParse;
 require Av4::Room;
 require Av4::Commands;
 use Av4::Utils qw/get_logger ansify/;
@@ -166,7 +166,7 @@ sub cmd_debug {
 sub cmd_help {
     my ( $client, $user, $argstr ) = @_;
     $argstr = 'help' if ( $argstr =~ /^\s*$/ );
-    my $helppage = Av4::HelpParse::areahelp( $user->server->helps, $argstr );
+    my $helppage = Av4::AreaParse::areahelp( $user->server->helps, $argstr );
     if ( defined $helppage ) {
         return [
             0,
@@ -202,9 +202,9 @@ sub cmd_hlist {
         0,
         "$Av4::Utils::ANSI{'&c'}Available help pages$Av4::Utils::ANSI{'&w'}:\n"
           . join(
-            '', map { $_->keywords . "\n" }
-              grep { $_->keywords !~ /^_/ }
-              sort { $a->keywords cmp $b->keywords } @{ $user->server->helps }
+            '', map { sprintf("L %-3d %s\n", $_->level, "@{ $_->keywords }" ) }
+              grep { $_->keywords->[0] !~ /^_/ }
+              sort { $a->keywords->[0] cmp $b->keywords->[0] } @{ $user->server->helps }
           )
           . $Av4::Utils::ANSI{"&c"}
           . scalar @{ $user->server->helps }
@@ -221,7 +221,12 @@ sub cmd_areas {
         "$Av4::Utils::ANSI{'&c'}Areas$Av4::Utils::ANSI{'&w'}:\n" . join(
             '',
             map {
-                sprintf( "%4d %-30s (%d rooms: %s)\n", $_->id, $_->name, scalar @{ $_->rooms }, join( ', ', map { $_->vnum } @{ $_->rooms } ) )
+                sprintf(
+                    "%4d %-25s %-30s (%d rooms: %s)\n",
+                    $_->id, $_->filename, $_->name,
+                    scalar @{ $_->rooms },
+                    join( ', ', map { $_->vnum } @{ $_->rooms } )
+                  )
               }
               sort { $a->id <=> $b->id } @{ $user->server->areas }
           )

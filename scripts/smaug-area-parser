@@ -1,0 +1,530 @@
+#!/usr/bin/env perl
+# vim: foldmethod=marker foldlevel=999:
+use 5.010_001;
+use strict;
+use warnings;
+use lib 'lib';
+use utf8::all;
+use Fatal qw/open close/;
+use JSON::XS qw<>;
+use YAML qw <>;
+use Getopt::Long::Descriptive;
+
+my ( $opt, $usage ) = describe_options(
+    '%c %o filename.are',
+    [ 'no-area',   'do not parse #AREA sections from the file' ],
+    [ 'no-room',   'do not parse #ROOM section from the file' ],
+    [ 'no-mobs',   'do not parse #MOBILES section from the file' ],
+    [ 'no-resets', 'do not parse #RESETS section from the file' ],
+    [],
+    [ 'verbose|v', 'print extra information when parsing' ],
+    [ 'help|h',    'print usage message and exit' ],
+);
+print( $usage->text ), exit if $opt->help;
+print( "No area filename given - aborting\nUsage: ",                     $usage->text ), exit if ( !@ARGV );
+print( "Can only use one area file argument - aborting\nUsage: ",        $usage->text ), exit if ( scalar @ARGV > 1 );
+print( "Given area file name '$ARGV[0]' not a file - aborting\nUsage: ", $usage->text ), exit if ( !-f $ARGV[0] );
+
+sub area_file_parse {    # Parses an area file, returning a hashref structure of it, by sections
+    my $fn = shift;
+    open my $F, '<', $fn;
+    my $details         = {};
+    my $lineno          = 0;
+    my $in_prog         = 0;
+    my $current_section = '';
+    my $room;
+    my $prog;
+    my $mob;
+    my $obj;
+    my $repairs;
+    my $specials;
+    my $tmp_keyw = '';
+    my $tmp_desc = '';
+    my $exit;
+    my $help;
+    my $do_extra;
+    my $do_affects;
+    my %seen_area_section;
+
+    while (<$F>) {
+        my $line = $_;
+        $lineno++;
+
+        next if ( $line =~ /^\s*$/ && !$current_section );    # skip non-significant whitespace before #ROOMS etc
+
+        if ( !$current_section ) {                            # {{{ begin/end section, and non-sections (despite them starting with #)
+
+            # These should not be considered "sections" per se, therefore they do not set the $current_section, but
+            # merely set some of the area's properties.
+            if ( $line =~ /^#AREA\s*([^~]+)~/ )     { $details->{name}    = $1; next }
+            if ( $line =~ /^#VERSION\s*(\d+)\s*$/ ) { $details->{version} = $1; next }
+            if ( $line =~ /^#CLIMATE\s*(\d+\s+)+\s*$/ ) { $details->{climate} = [ split( /\s+/, $1 ) ]; next }
+            if ( $line =~ /^#AUTHOR\s*([^~]+)~/ ) { $details->{author} = $1; next }
+            if ( $line =~ /^#RANGES\s*((?:[\d\s])+)\$/ ) { $details->{ranges} = [ split( /\s+/, $1 ) ]; next }
+            if ( $line =~ /^#RESETMSG\s*([^~]+)~/ ) { $details->{resetmsg} = $1; next }
+            if ( $line =~ /^#FLAGS\s*([\d\s]+)~/ )    { $details->{flags}   = [ split( /\s+/, $1 ) ]; next }
+            if ( $line =~ /^#ECONOMY\s*([\d\s]+)~?/ ) { $details->{economy} = [ split( /\s+/, $1 ) ]; next }
+
+            # a # followed by a word indicates a new section
+            if ( $line =~ /^#\s*(\w+)\s*$/ ) { $current_section = uc $1; next }
+
+            # A #$ usuallly indicates the end of the file
+            if ( $line =~ /^#\$$/ ) { $current_section = undef; next }
+
+            die "Line $lineno: unknown token: '$line'\n";    # No idea about anything that isn't caught by the regexes above
+        }    # }}}
+
+        # #RANGES
+        # 1 2 3 4
+        # $
+        #
+        if ( $current_section eq 'RANGES' ) {    # {{{
+            if ( $line =~ /^((?:\d+\s*)+)$/ ) {
+                $details->{ranges} = [ split( /\s+/, $1 ) ];
+                next;
+            }
+            if ( $line =~ /^\$\s*$/ ) {
+                $current_section = undef;
+                next;
+            }
+            die "Line $lineno: section RANGES, unknown token: '$line'\n";
+        }    # }}}
+
+        # #FLAGS
+        # 12345
+        #
+        if ( $current_section eq 'FLAGS' ) {    # {{{
+            if ( $line =~ /^(\d+\s*)+$/ ) {
+                $details->{flags} = [ split( /\s+/, $1 ) ];
+                $current_section = undef;
+                next;
+            }
+            die "Line $lineno: section FLAGS, unknown token: '$line'\n";
+        }    # }}}
+
+        if ( $current_section eq 'ROOMS' ) {    # {{{
+
+            if ( $in_prog ) {
+                if ( !$prog && $line =~ /~$/ && ( $line =~ /^>\s+(\w+_prog)\s+(\w)\s+([^~]+)\s*~$/ || $line =~ /^>\s*(\w+_prog)\s*(\d+)\s*~/ || $line =~ /^>\s*(\w+_prog)\s*()([^~]+)~/ ) ) {
+                    $prog = {
+                        prog_type      => $1,
+                        trigger_entity => $2 // '',
+                        trigger_regex  => $3 // '',
+                    };
+                    next;
+                }
+                if ( $line =~ /^\s*\|\s*$/ ) {
+                    $in_prog = 0;
+                    next;
+                }
+                if ( !$prog ) {
+                    die "Line $lineno: ROOMS PROG, unknown token: '$line' -- did not match start of prog\n";
+                }
+                if ( $line =~ /^([^~]*)(~?)\s*$/ ) {
+                    $prog->{code} //= '';
+                    $prog->{code} .= $1;
+                    if ($2) { push @{ $room->{progs} }, { %$prog }; $prog = undef; }
+                    next;
+                }
+                die "Line $lineno: ROOMS PROG, unknown token: '$line'\n";
+            }
+
+            if ( $line =~ /^#(\d+)\s*$/ ) {
+                if ( defined $room ) {
+                    my $oroom = {%$room};
+                    push @{ $details->{rooms} }, $oroom;
+                    $room     = undef;
+                    $tmp_desc = '';
+                }
+                if ( $line =~ /^#0$/ ) {
+                    $current_section = undef;
+                    next;
+                }
+            }
+            if ( !defined $room && $line =~ /^#(\d+)\s*$/ ) { $room = { vnum => $1, }; next }
+            if ( !exists $room->{name} && $line =~ /^([^~]+)~$/ ) { $room->{name} = $1; next }
+            if ( !exists $room->{desc} && $line =~ /^([^~]+)~$/ ) { $tmp_desc .= $1; $room->{desc} = $tmp_desc; next }
+            if ( !exists $room->{desc} && $line !~ /^~$/ ) { $tmp_desc .= $line; next }
+            if ( !exists $room->{desc} && $line =~ /^~$/ ) { $room->{desc} = $tmp_desc; next }
+            if ( !exists $room->{flags} && $line =~ /^(\d+\s+)+$/ ) { $room->{flags} = [ split( /\s+/, $1 ) ]; next }
+
+            # Now the room's exits
+            if ( !$exit && $line =~ /^(D)(\d+)$/ ) {
+                $exit = { door => $2, };
+                $tmp_desc = '';
+                next;
+            }
+            if ($exit) {
+                if ( !exists $exit->{desc} ) {
+                    if ( $line !~ /^~$/ ) {
+                        $tmp_desc .= $line;
+                    }
+                    else {
+                        $exit->{desc} = $tmp_desc;
+                        $tmp_desc = '';
+                    }
+                    next;
+                }
+                if ( !exists $exit->{keywords} && $line =~ /^([^~]*)~$/ ) {
+                    $exit->{keywords} = [ split( /\s+/, $1 ) ];
+                    next;
+                }
+                if ( !exists $exit->{flags} && $line =~ /^([-\d\s]+)$/ ) {
+                    my @flags = split( /\s+/, $line );
+
+                    # locks, key, to_vnum, vdir, orig_door, distance, pulltype, pull
+                    $exit->{locks}   = $flags[0];
+                    $exit->{key}     = $flags[1];
+                    $exit->{to_vnum} = $flags[2];
+                    $exit->{flags}   = [@flags];
+                    next;
+                }
+                if ( $line =~ /^([D])(\d+)$/ || $line =~ /^[SE]$/ || $line =~ /^>/ ) {
+                    push @{ $room->{exits} }, $exit;
+                    $tmp_desc = '';
+                    $exit = undef;
+                    $lineno--;
+                    redo;
+                }
+                if ( $line =~ /^M/ ) {
+
+                    # not yet parsed
+                    next;
+                }
+                die "Line $lineno: section ROOMS/EXIT, unknown token: '$line'\n";
+            }
+            if ( $line =~ /^E$/ ) {
+                $do_extra = 1;
+                next;
+            }
+            if ($do_extra) {
+                if ( $line !~ /^~$/ ) {
+                    $tmp_desc .= $line;
+                }
+                else {
+                    push @{ $room->{extra} }, $tmp_desc;
+                    $tmp_desc .= '';
+                    $do_extra = 0;
+                }
+                next;
+            }
+            if ( $line =~ /^M/ ) {
+                next;
+            }
+            if ( $line =~ /^S$/ ) {
+                next;
+            }
+            if ( $line =~ /^>/ ) {
+                $lineno--;
+                $in_prog = 1;
+                redo;
+            }
+            die "Line $lineno: section ROOMS, unknown token: '$line'\n";
+        }    # }}}
+
+        if ( $current_section eq 'MOBILES' ) {    # {{{
+            if ( $line =~ /^#(\d+)\s*$/ ) {
+                if ($mob) {
+                    my $omob = {%$mob};
+                    push @{ $details->{mobiles} }, $omob;
+                    $mob      = undef;
+                    $tmp_desc = '';
+                }
+                if ( $line =~ /^#0$/ ) {
+                    $current_section = undef;
+                    next;
+                }
+            }
+
+            if ( $in_prog ) {
+                if ( !$prog && $line =~ /~$/ && ( $line =~ /^>\s+(\w+_prog)\s+(\w)\s+([^~]+)\s*~$/ || $line =~ /^>\s*(\w+_prog)\s*(\d+)\s*~/ || $line =~ /^>\s*(\w+_prog)\s*()([^~]+)~/ ) ) {
+                    $prog = {
+                        prog_type      => $1,
+                        trigger_entity => $2 // '',
+                        trigger_regex  => $3 // '',
+                    };
+                    next;
+                }
+                if ( $line =~ /^\s*\|\s*$/ ) {
+                    $in_prog = 0;
+                    next;
+                }
+                if ( !$prog ) {
+                    die "Line $lineno: MOBILES PROG, unknown token: '$line' -- did not match start of prog\n";
+                }
+                if ( $line =~ /^([^~]*)(~?)\s*$/ ) {
+                    $prog->{code} //= '';
+                    $prog->{code} .= $1;
+                    if ($2) { push @{ $mob->{progs} }, { %$prog }; $prog = undef; }
+                    next;
+                }
+                die "Line $lineno: MOBILES PROG, unknown token: '$line'\n";
+            }
+
+            if ( !defined $mob && $line =~ /^#(\d+)\s*$/ ) { $mob = { vnum => $1, }; next }
+            if ( !exists $mob->{keywords} && $line =~ /^([^~]+)~$/ ) { $mob->{keywords} = [ split( /\s+/, $1 ) ]; next }
+            if ( !exists $mob->{name} && $line =~ /^([^~]+)~$/ ) { $mob->{name} = $1; next }
+            if ( !exists $mob->{short} && $line !~ /^~$/ ) { $tmp_desc .= $line; next }
+            if ( !exists $mob->{short} && $line =~ /^~$/ ) { $mob->{short} = $tmp_desc; $tmp_desc = ''; next }
+            if ( !exists $mob->{desc} && $line !~ /^~$/ ) { $tmp_desc .= $line; next }
+            if ( !exists $mob->{desc} && $line =~ /^~$/ ) { $mob->{desc} = $tmp_desc; $tmp_desc = ''; next }
+            if ( !exists $mob->{flags} ) { $mob->{flags} = [ split( /\s+/, $line ) ]; next }
+            if ( !exists $mob->{damage} ) { $mob->{damage} = [ split( /\s+/, $line ) ]; next }
+            if ( !exists $mob->{xp} )      { $mob->{xp}      = [ split( /\s+/, $line ) ]; next }
+            if ( $line =~ /^>/ ) {
+                $lineno--;
+                $in_prog = 1;
+                redo;
+            }
+            if ( !exists $mob->{dump1} )   { $mob->{dump1}   = [ split( /\s+/, $line ) ]; next }
+            if ( !exists $mob->{stats} )   { $mob->{stats}   = [ split( /\s+/, $line ) ]; next }
+            if ( !exists $mob->{bonuses} ) { $mob->{bonuses} = [ split( /\s+/, $line ) ]; next }
+            if ( !exists $mob->{dump2} )   { $mob->{dump2}   = [ split( /\s+/, $line ) ]; next }
+            if ( !exists $mob->{dump3} )   { $mob->{dump3}   = [ split( /\s+/, $line ) ]; next }
+
+            die "Line $lineno: section MOBILES, unknown token: '$line'\n";
+        }    # }}}
+
+        if ( $current_section eq 'SHOPS' ) {    # {{{
+            if ( $line =~ /^0$/ ) {
+                $current_section = undef;
+                next;
+            }
+            if ( $line =~ /^\s*((?:-?\d+\s*)+)(;?.*)?$/ ) {
+                push @{ $details->{shops} }, [ split(/\s+/,$1), $2 ];
+                next;
+            }
+
+            die "Line $lineno: section SHOPS, unknown token: '$line'\n";
+        }    # }}}
+
+        if ( $current_section eq 'REPAIRS' ) {    # {{{
+            if ( $line =~ /^0$/ ) {
+                $current_section = undef;
+                next;
+            }
+            if ( $line =~ /^\s*((?:-?\d+\s*)+)(;?.*)?$/ ) {
+                push @{ $details->{repairs} }, [ split(/\s+/,$1), $2 ];
+                next;
+            }
+
+            die "Line $lineno: section REPAIRS, unknown token: '$line'\n";
+        }    # }}}
+
+        if ( $current_section eq 'SPECIALS' ) {    # {{{
+            if ( $line =~ /^S$/ ) {
+                $current_section = undef;
+                next;
+            }
+            if ( $line =~ /^(\w)\s*(\d+)\s+([\w_]+)\s*$/ ) {    # M VNUM spec_*
+                push @{ $details->{specials} }, {
+                    type => $1,
+                    vnum => $2,
+                    spec => $3,
+                };
+                next;
+            }
+
+            die "Line $lineno: section SPECIALS, unknown token: '$line'\n";
+        }    # }}}
+
+        if ( $current_section eq 'OBJECTS' ) {    # {{{
+            if ( $line =~ /^#(\d+)\s*$/ ) {
+                if ($obj) {
+                    my $oobj = {%$obj};
+                    push @{ $details->{objects} }, $oobj;
+                    $obj      = undef;
+                    $tmp_desc = '';
+                }
+                if ( $line =~ /^#0$/ ) {
+                    $current_section = undef;
+                    next;
+                }
+            }
+
+            if ( $do_affects ) {
+                push @{ $obj->{affects} }, [ split(/\s+/, $line) ];
+                $do_affects = 0;
+                next;
+            }
+
+            if ( $in_prog ) {
+                if ( !$prog && $line =~ /~$/ && ( $line =~ /^>\s+(\w+_prog)\s+(\w)\s+([^~]+)\s*~$/ || $line =~ /^>\s*(\w+_prog)\s*(\d+)\s*~/ || $line =~ /^>\s*(\w+_prog)\s*()([^~]+)~/ ) ) {
+                    $prog = {
+                        prog_type      => $1,
+                        trigger_entity => $2 // '',
+                        trigger_regex  => $3 // '',
+                    };
+                    next;
+                }
+                if ( $line =~ /^\s*\|\s*$/ ) {
+                    $in_prog = 0;
+                    next;
+                }
+                if ( !$prog ) {
+                    die "Line $lineno: OBJECTS PROG, unknown token: '$line' -- did not match start of prog\n";
+                }
+                if ( $line =~ /^([^~]*)(~?)\s*$/ ) {
+                    $prog->{code} //= '';
+                    $prog->{code} .= $1;
+                    if ($2) { push @{ $obj->{progs} }, { %$prog }; $prog = undef; }
+                    next;
+                }
+                die "Line $lineno: OBJECTS PROG, unknown token: '$line'\n";
+            }
+
+            if ( !defined $obj && $line =~ /^#(\d+)\s*$/ ) { $obj = { vnum => $1, }; next }
+            if ( !exists $obj->{name} && $line =~ /^([^~]+)~$/ ) { $obj->{name} = $1; next }
+            if ( !exists $obj->{short} && $line =~ /^([^~]*)(~?)\s*$/ ) {
+                $tmp_desc .= $1;
+                if ($2) { $obj->{short} = $tmp_desc; $tmp_desc = ''; }
+                next;
+            }
+            if ( !exists $obj->{desc} && $line =~ /^([^~]*)(~?)\s*$/ ) {
+                $tmp_desc .= $1;
+                if ($2) { $obj->{desc} = $tmp_desc; $tmp_desc = ''; }
+                next;
+            }
+            if ( !exists $obj->{action} && $line =~ /^([^~]*)(~?)\s*$/ ) {
+                $tmp_desc .= $1;
+                if ($2) { $obj->{action} = $tmp_desc; $tmp_desc = ''; }
+                next;
+            }
+            if ( $line =~ /^(\-?\d+\s*)+\s*$/ ) {
+                push @{ $obj->{dump} }, ( split( /\s+/, $line ) );
+                next;
+            }
+            if ( $line =~ /^(?:'([\w\s]+)'\s*)+$/ ) {
+                push @{ $obj->{spells} }, $line;
+                next;
+            }
+            if ( $line =~ /^E$/ ) {
+                $do_extra = 1;
+                $tmp_keyw = '';
+                $tmp_desc = '';
+                next;
+            }
+            if ($do_extra) {
+                if ( $line =~ /^([^~])*(~?)\s*/ ) {
+                    if ( !$tmp_keyw ) { $tmp_keyw = $1; next }
+                    $tmp_desc .= $1 if $1;
+                    if ($2) {
+                        push @{ $room->{extra} }, { keywords => $tmp_keyw, desc => $tmp_desc };
+                        $tmp_keyw = '';
+                        $tmp_desc = '';
+                        $do_extra = 0;
+                    }
+                    next;
+                }
+            }
+            if ( $line =~ /^A$/ ) {
+                $do_affects = 1;
+                next;
+            }
+            if ( $line =~ /^>/ ) {
+                $lineno--;
+                $in_prog = 1;
+                redo;
+            }
+            die "Line $lineno: section OBJECTS, unknown token: '$line'\n";
+        }    # }}}
+
+        if ( $current_section eq 'RESETS' ) {    # {{{
+            if ( $line =~ /^S$/ ) {
+                $current_section = undef;
+                next;
+            }
+
+            # Letter EXTRA arg1 arg2 arg3?
+            if ( $line =~ /^R\s+(\d+)\s+(\d+)\s+(\d+)\s*$/ ) {    # Room reset: ?? vnum ??
+                next;
+            }
+            if ( $line =~ /^M\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/ ) {    # MOB reset: ?? mob_vnum ?? room_vnum
+                next;
+                if ( my ($mob) = grep { $_->{vnum} eq $2 } @{ $details->{mobiles} } ) {
+                    $mob->{in_room} = $4;
+                    next;
+                }
+                else {
+                    die "Line $lineno: mob VNUM $2 was not found in file: '$line'\n";
+                }
+            }
+            if ( $line =~ /^O\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/ ) {    # ROOM OBJ reset: ?? obj_vnum 1 location_num
+                next;
+            }
+            if ( $line =~ /^P\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/ ) {    # ROOM OBJ NESTED WITHIN PREVIOUS OBJECT reset: ?? obj_vnum 1 location_num
+                next;
+            }
+            if ( $line =~ /^E\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/ ) {    # EQUIP MOB reset: ?? obj_vnum ?? location_num
+                next;
+            }
+            if ( $line =~ /^G\s+(\d+)\s+(\d+)\s+(\d+)\s*$/ ) {            # INVENTORY MOB reset: ?? obj_vnum ??
+                next;
+            }
+            if ( $line =~ /^D\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/ ) {    # DOOR reset: ?? room_vnum ?? ??
+                next;
+            }
+            if ( $line =~ /^T\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*$/ ) {    # TRAP reset: type ?? ?? ?? room_vnum?
+                next;
+            }
+            die "Line $lineno: section RESETS, unknown token: '$line'\n";
+        }    # }}}
+
+        if ( $current_section eq 'HELPS' ) {    # {{{
+            if ( $line =~ /^0\s*\$\s*$/ ) {
+                $current_section = undef;
+                $tmp_desc        = '';
+                next;
+            }
+            next if ( !$help && $line =~ /^\s*$/ );
+            if ( !$help ) {
+
+                # LEVEL keywords
+                # more keywords
+                # more keywords~
+                # help text
+                # ~
+                if ( $line =~ /^([^~]+)\s*$/ ) {
+                    chomp $line;
+                    $tmp_desc .= $line;
+                    next;
+                }
+                if ( $line =~ /^([^~]+)~$/ ) {
+                    my $tmp = "$tmp_desc$1";
+                    if ( $tmp =~ /^(\-?\d+)\s*([^~]+)\s*$/ ) {
+                        $help = {
+                            level    => $1,
+                            keywords => [ split( /\s+/, $2 ) ],    # FIXME keywords like 'a b c' should be taken care of
+                            text     => '',
+                        };
+                        $tmp_desc = '';
+                        next;
+                    }
+                    else {
+                        die "Line $lineno: Multi-line HELP problems: $line\n";
+                    }
+                }
+            }
+            if ( $help && $line =~ /^([^~]*)(~?)\s*$/ ) {
+                $help->{text} .= $1;
+                if ($2) {
+                    $obj->{short} = $tmp_desc;
+                    $tmp_desc = '';
+                    push @{ $details->{helps} }, {%$help};
+                    $help = undef;
+                    next;
+                }
+                next;
+            }
+            die "Line $lineno: section HELPS, unknown token: '$line'\n";
+        }    # }}}
+
+        die "Line $lineno: unknown section '$current_section' unknown token: '$line'\n";
+    }
+    close $F;
+    return {%$details};
+}
+
+my $data = area_file_parse( $ARGV[0] );
+print JSON::XS->new->utf8->pretty->indent->encode($data);
+

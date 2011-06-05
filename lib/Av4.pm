@@ -13,6 +13,8 @@ use Log::Log4perl;
 use YAML;
 
 use Av4::Help;
+use Av4::Area;
+use Av4::AreaParse;
 use Av4::Entity;
 use Av4::Entity::Player;
 use Av4::Entity::Mobile;
@@ -21,8 +23,6 @@ require Av4::Server;
 require Av4::Command;            # access to %time_taken_by_command
 require Av4::Commands::Basic;    # to invalidate the who list
 
-use Av4::HelpParse;
-use Av4::AreaParse;
 use Av4::Telnet qw/
   %TELOPTS %TELOPTIONS
   TELOPT_FIRST
@@ -115,7 +115,7 @@ sub new {
         my $conf = q{
             log4perl.category.Av4 = DEBUG, Screen
             log4perl.category.main.new_dispatch_command = TRACE, Screen
-            log4perl.category.Av4.HelpParse = WARN, Screen
+            log4perl.category.Av4.AreaParse = WARN, Screen
             log4perl.appender.Screen = Log::Log4perl::Appender::Screen
             log4perl.appender.Screen.stderr = 0
             log4perl.appender.Screen.layout = PatternLayout
@@ -123,7 +123,6 @@ sub new {
         };
         Log::Log4perl::init( \$conf );
     }
-    $opts->{helpfile} = 'help.are' if ( !defined $opts->{helpfile} );
     $opts->{areadir}  = 'areas'    if ( !defined $opts->{areadir} );
     my $self = {};
     $listen_address    = $opts->{listen_address} if ( defined $opts->{listen_address} );
@@ -131,24 +130,24 @@ sub new {
     $sec_tick_flush    = $opts->{tick_flush}     if ( defined $opts->{tick_flush} );
     $sec_tick_commands = $opts->{tick_commands}  if ( defined $opts->{tick_commands} );
     $sec_tick_mobiles  = $opts->{tick_mobiles}   if ( defined $opts->{tick_mobiles} );
-    $self->{helpfile}  = $opts->{helpfile};
     $self->{areadir}   = $opts->{areadir};
     return bless $self, $class;
 }
 
 # Actually runs the MUD. This needs called if you actually want to run the
-# thing. It also performs the startup stuff (loading helps, areas etc) and
-# displays execution statistics at the end. Stuff like this should probably
-# be moved to Av4::Server.
+# thing. It also performs the startup stuff (loading areas etc) and displays
+# execution statistics at the end. Stuff like this should probably be moved
+# to Av4::Server.
 sub run {
     my $self = shift;
     $server = Av4::Server->new(
-        helps => Av4::HelpParse::areaparse( $self->{helpfile} ),
-        areas => Av4::AreaParse::areaparse( $self->{areadir} ),
+        areas => Av4::AreaParse::parse_areas_from_dir( $self->{areadir} ),
+        helps => $Av4::AreaParse::helps,
     );
-    warn "Parsed helps from file '$self->{helpfile}' -- helps parsed: " . scalar @{ $server->helps } . "\n";
-    warn "Parsed areas from dir  '$self->{areadir}' -- areas parsed: " . scalar @{ $server->areas } . "\n";
-    my $banner = eval { Av4::HelpParse::areahelp( $server->helps, '__WELCOME__SCREEN__' )->data };
+    warn "Parsed areas from dir  '$self->{areadir}'\n";
+    warn "  -- areas parsed: " . scalar @{ $server->areas } . "\n";
+    warn "  -- helps parsed: " . scalar @{ $server->helps } . "\n";
+    my $banner = eval { Av4::AreaParse::areahelp( $server->helps, '__WELCOME__SCREEN__' )->data };
     $banner = "Hi, Welcome to the MUD!\r\n" if !defined $banner;
     $banner .= "\r\n";
     $mud_welcome_banner =
@@ -469,6 +468,7 @@ sub client_error {
 # This gets called whenever a client quits.
 sub client_quit {
     broadcast(
+        $_[0],
         "&W$_[0] &Gquits the MUD\n\r",
         1,                                     # send prompt to others
     );
@@ -546,7 +546,11 @@ sub tick_commands {
     my $time = time;
     push @delta_tick_commands, [ $time, tv_interval( $t0, [gettimeofday] ) ];
     warn "**** TICK COMMANDS LAG *** $delta_tick_commands[-1]->[1] vs $sec_tick_commands\n" if $delta_tick_commands[-1]->[1] > $sec_tick_commands;
-    scalar @delta_tick_commands > 800 && $quit_program->send("Shut down after 800 command ticks");
+    if ( scalar @delta_tick_commands >= 800 ) {
+        Av4->broadcast( '** SHUTTING DOWN AFTER 800 COMMANDS TICKS **', 0 );    # no prompt
+        tick_flush();    # Have all clients receive the previous message
+        $quit_program->send("Shut down after 800 command ticks");
+    };
 }
 
 # Mobiles tick: the monsters' AI.
@@ -563,6 +567,7 @@ sub shutdown {
     my ( $self, $bywho ) = @_;
     my $shutdown_by = $bywho->id;
     broadcast( $bywho->id, "$shutdown_by initiated shutdown...\n", 0 );
+    tick_flush();    # Have all clients receive the previous message
     $quit_program->send($shutdown_by);
 }
 
