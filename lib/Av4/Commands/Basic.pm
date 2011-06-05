@@ -431,11 +431,8 @@ sub cmd_look {
             ( @{ $room->entities } > 1 )
             ? (
                     "\r\n" 
-                  . $Av4::Util::ANSI{'&W'} 
-                  . 'Entities here: ' 
-                  . $Av4::Util::ANSI{'&w'}
                   . join( "\r\n",
-                    map { sprintf( '%s (%s) - %s', $_->name, $_->id, $_->short ) }
+                    map { sprintf( '%s - %s', $_->name, $_->short ) }
                     grep { defined }
                     grep { $_ ne $user } @{ $room->entities } )
                   . $Av4::Util::ANSI{'&^'} . "\r\n"
