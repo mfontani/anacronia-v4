@@ -26,7 +26,7 @@ BEGIN {
 
     before attempting to launch ./mud again.
 
-    \n" if ( !-f 'auto/Av4/Ansi/Ansi.bs' || !-f 'auto/Av4/Ansi/Ansi.bundle' );
+    \n" if ( !-f 'auto/Av4/Ansi/Ansi.bs' );
 
 }
 use Av4;
