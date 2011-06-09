@@ -4,7 +4,7 @@ use IO::Async;
 
 BEGIN {
     if ( $^O eq 'darwin' ) {
-        require AnyEvent::Impl::Event;
+        require AnyEvent::Impl::IOAsync;    # 'bad symbol for filehandle' given by Event
     }
     else {
         require AnyEvent::Impl::EV;
