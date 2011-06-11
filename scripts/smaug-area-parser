@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+use lib './inc/lib/perl5', './lib';
 # vim: foldmethod=marker foldlevel=999:
 use 5.010_001;
 use strict;

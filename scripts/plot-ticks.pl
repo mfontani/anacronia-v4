@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+use lib './inc/lib/perl5', './lib';
 use common::sense;
 use Chart::Clicker;
 use Chart::Clicker::Data::Series;

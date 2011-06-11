@@ -1,10 +1,10 @@
-#!/usr/bin/env perl
-use 5.010_001;    # at least
+#!perl5/perlbrew/perls/perl-5.14.0/bin/perl
 use strict;
 use warnings;
+use v5.14.0;
 use Getopt::Long;
 use Pod::Usage;
-use lib './lib';
+use lib './inc/lib/perl5/', './lib';
 
 # Ensure the wanted AnyEvent implementation is loaded on OSX
 BEGIN {

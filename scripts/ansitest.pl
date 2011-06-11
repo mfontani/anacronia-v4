@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use lib './lib';
+use lib './inc/lib/perl5', './lib';
 use Av4::Ansi;
 
 print "type a smaug-coloured string\n";

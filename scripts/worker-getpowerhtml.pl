@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+use lib './inc/lib/perl5', './lib';
 use strict;
 use warnings;
 use Gearman::XS qw(:constants);

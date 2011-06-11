@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 use strict;
-use IO::Async;
+use lib './inc/lib/perl5', './lib';
 
 BEGIN {
     if ( $^O eq 'darwin' ) {

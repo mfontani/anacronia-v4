@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 use warnings;
-use lib './lib';
+use lib './inc/lib/perl5', './lib';
 use File::Slurp qw/slurp/;
 use Av4::Telnet qw/%TELOPTS %TELOPTIONS/;
 

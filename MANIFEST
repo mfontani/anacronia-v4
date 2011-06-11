@@ -1,6 +1,5 @@
 areas/basic.json
 areas/namelesscity.json
-auto
 benchmarks/ansi-inline-vs-perl.pl
 benchmarks/av4-filter-v-telnet-options--nonmoose.pl
 benchmarks/av4-filter-v-telnet-options.pl

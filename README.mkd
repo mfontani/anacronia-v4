@@ -22,12 +22,15 @@ ticks, whilst gathering statistics.
 Prerequisites
 =============
 
-In order to start the MUD, you'll need the following Perl modules installed.
-You will also need a working C compiler, as the program uses XS code.
-You may want to use App::cpanminus to install these, as that allows you to
-have them installed in your $HOME rather than system wide.
-Patches to create a local::lib with the prerequisite modules installed under
-inc/ are welcome.
+You need a working C compiler, and a bit of time.
+
+Av4 makes or will make use of most of the functionalities offered by modern
+versions of Perl. In order to ensure the environment it runs in is as good as
+it can be, the `Build.PL` installer will fetch, build and install a local
+Perl 5.14.0 interpreter and all needed libraries in the `perl5/perlbrew`
+directory.
+
+The additional modules Av4 needs or uses are:
 
     Getopt::Long                    Used to get command-line args for "mud"
     Pod::Usage                      Used to show the manpage for "mud"
@@ -53,33 +56,30 @@ inc/ are welcome.
         EV                          For Linux; seems to not work correctly on OSX
         Event                       For OSX
 
-You may install the prerequisite modules by issuing commands similar to the following:
+In order to install and build the Perl interpreter and the MUD, all you need to do
+is launch, with the *system* perl:
 
-    $ cpan  Digest::MD5
-    $ cpanm Digest::MD5
+    $ /usr/bin/perl Build.PL
 
-A Build.PL file is also included, and it may (or may not) help you installing
-the right prerequisites, too.
-
-In order for the XS code to be built, at least the following must be ran:
-
-    $ perl Build.PL
-    $ ./Build
+This will:
+- Download perl-5.14.0 and install it under perl5/perlbrew
+- Download and install all the prerequisites under the brewed perl
+- Compile the Av4 XS modules
 
 Launching the MUD
 =================
 
-Once the prerequisite modules are installed and working, you can launch the
-MUD by typing, in the root of this repository:
+Once the prerequisite Perl and modules are installed and working, you can launch
+the MUD by typing, in the root of this repository:
 
-    $ perl mud
+    $ ./mud
     [...] lots of output
     TCP ready on address * port 8081
 
-The "mud" program accepts several options; you can see these options by
-typing the following:
+The `mud` program will use the brewed Perl under `perl5/perlbrew`. It accepts
+several options; you can see these options by typing the following:
 
-    $ perl mud --help
+    $ ./mud --help
     Usage:
         ./mud [options]
     #  ..  follows list of options
@@ -214,15 +214,18 @@ part which doesn't (the startup and shutdown, which only happen once).
 
 To invoke the MUD under Devel::NYTProf, asking it to not start straightaway, use:
 
-    $ NYTPROF=start=no perl -d:NYTProf ./mud
+    $ NYTPROF=start=no ./perl5/perlbrew/perls/perl-5.14.0/bin/perl -d:NYTProf ./mud
     [...]
-    $ nytprofhtml -d          # or with --minimal for only "lines" output
+
+    $ ./perl5/perlbrew/perls/perl-5.14.0/bin/nytprofhtml -d
+        # or with --minimal for only "lines" output
 
 The scripts
 -----------
 
 There are some scripts which have been used during the development at one time or
-the other.
+the other. All of the scripts -- where required -- are set to run with the perlbrewed
+perl residing in perl5/perlbrew.
 
 Fuzzier:
 
