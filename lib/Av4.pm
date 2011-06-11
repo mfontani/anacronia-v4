@@ -222,6 +222,7 @@ sub run {
         DB::enable_profile();
     }
 
+    $listen_address = '::' if !defined $listen_address;
     tcp_server(
         $listen_address,
         $listen_port,
