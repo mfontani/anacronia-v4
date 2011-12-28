@@ -1,7 +1,7 @@
-#!perl5/perlbrew/perls/perl-5.14.0/bin/perl
+#!perl5/perlbrew/perls/perl-5.14.2/bin/perl
 use strict;
 use warnings;
-use v5.14.0;
+use v5.14.2;
 use Getopt::Long;
 use Pod::Usage;
 use lib './inc/lib/perl5/', './lib';

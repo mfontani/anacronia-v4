@@ -10,13 +10,13 @@ push @cpanmoptions, '--mirror', '/opt/minicpan',          '--mirror-only' if ( -
 push @cpanmoptions, '--mirror', '/STUFF/minicpan',        '--mirror-only' if ( -d '/STUFF/minicpan' );
 push @cpanmoptions, '--mirror', '/linuxbackups/minicpan', '--mirror-only' if ( -d '/linuxbackups/minicpan' );
 
-my $PERL = $PWD . '/perl5/perlbrew/perls/perl-5.14.0/bin/perl';
+my $PERL = $PWD . '/perl5/perlbrew/perls/perl-5.14.2/bin/perl';
 
 if ( ! -f $PERL ) {
-  warn "\n\nYou do not yet have Perl 5.14.0 under $PERL, I will now build it.\n\n";
+  warn "\n\nYou do not yet have Perl 5.14.2 under $PERL, I will now build it.\n\n";
   my @build_perlbrew = (
     qw<PERLBREW_ROOT=$(pwd)/perl5/perlbrew PERLBREW_HOME=$(pwd)/perl5/perlbrew $(pwd)/perl5/perlbrew/bin/perlbrew install>,
-    qw< --notest perl-5.14.0 -D uselargefiles>,
+    qw< --notest perl-5.14.2 -D uselargefiles>,
     qw<-D cccflags=-fpic -D optimize=-O2 -D usehrplib>,
     #qw<-D usethreads>, # no need for threads for Av4
     qw<-D use64bitall>
@@ -24,19 +24,19 @@ if ( ! -f $PERL ) {
   open my $brewit, '>', 'brewit.sh' or die "Could not create brewit.sh: $!";
   print $brewit join(' ', @build_perlbrew);
   close $brewit;
-  system(qw</bin/bash ./brewit.sh>) == 0 or die "Could not build perl-5.14.0 :(";
+  system(qw</bin/bash ./brewit.sh>) == 0 or die "Could not build perl-5.14.2 :(";
   unlink 'brewit.sh';
   warn "\n\nBuild done. Now launching Build.PL with the newly created perl\n\n";
   exec($PERL,$0);
 }
 
-# Ensure we're running under 5.14.0
+# Ensure we're running under 5.14.2
 use Config;
-if ( $Config{api_versionstring} ne '5.14.0' ) {
-  warn "You are using Perl $Config{api_versionstring}; relaunching with $PERL...";
+if ( $Config{version} ne '5.14.2' ) {
+  warn "You are using Perl $Config{version}; relaunching with $PERL...";
   exec($PERL,$0);
 } else {
-  warn "You are using Perl 5.14.0.. Good!\n";
+  warn "You are using Perl 5.14.2.. Good!\n";
 }
 
 our @required_modules = (

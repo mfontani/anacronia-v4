@@ -27,7 +27,7 @@ You need a working C compiler, and a bit of time.
 Av4 makes or will make use of most of the functionalities offered by modern
 versions of Perl. In order to ensure the environment it runs in is as good as
 it can be, the `Build.PL` installer will fetch, build and install a local
-Perl 5.14.0 interpreter and all needed libraries in the `perl5/perlbrew`
+Perl 5.14.2 interpreter and all needed libraries in the `perl5/perlbrew`
 directory.
 
 The additional modules Av4 needs or uses are:
@@ -62,7 +62,7 @@ is launch, with the *system* perl:
     $ /usr/bin/perl Build.PL
 
 This will:
-- Download perl-5.14.0 and install it under perl5/perlbrew
+- Download perl-5.14.2 and install it under perl5/perlbrew
 - Download and install all the prerequisites under the brewed perl
 - Compile the Av4 XS modules
 
@@ -214,10 +214,10 @@ part which doesn't (the startup and shutdown, which only happen once).
 
 To invoke the MUD under Devel::NYTProf, asking it to not start straightaway, use:
 
-    $ NYTPROF=start=no ./perl5/perlbrew/perls/perl-5.14.0/bin/perl -d:NYTProf ./mud
+    $ NYTPROF=start=no ./perl5/perlbrew/perls/perl-5.14.2/bin/perl -d:NYTProf ./mud
     [...]
 
-    $ ./perl5/perlbrew/perls/perl-5.14.0/bin/nytprofhtml -d
+    $ ./perl5/perlbrew/perls/perl-5.14.2/bin/nytprofhtml -d
         # or with --minimal for only "lines" output
 
 The scripts
