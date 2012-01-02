@@ -1,7 +1,7 @@
 What is this?!
 ==============
 
-Anacronia v4 - Copyright (c) 2009-2011 Marco Fontani - MFONTANI at CPAN dot ORG
+Anacronia v4 - Copyright (c) 2009-2012 Marco Fontani - MFONTANI at CPAN dot ORG
 Released under the GPL v.3.0 license -- see LICENSE
 
 Anacronia V4 is the fourth rewrite of a Multi User Dungeon (MUD), a multi-user
